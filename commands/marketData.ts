@@ -1,5 +1,6 @@
 import { CommandModule } from 'yargs';
-import { createConnection, createProvider, createClient, loadPublicKey } from '../utils/setup';
+import { createConnection, createProvider, createClient, loadPublicKey, createStubWallet } from '../utils/setup';
+import { Market } from '@openbook-dex/openbook-v2';
 import logger from '../utils/logger';
 
 interface MarketDataArgs {
@@ -8,12 +9,12 @@ interface MarketDataArgs {
   book?: boolean;
 }
 
-const marketData: CommandModule = {
-  command: 'marketData',
+const marketData: CommandModule<{}, MarketDataArgs> = {
+  command: 'marketData <market>',
   describe: 'Monitor market order book',
   builder: (yargs) =>
     yargs
-      .option('market', {
+      .positional('market', {
         type: 'string',
         demandOption: true,
         description: 'Market public key',
@@ -26,39 +27,69 @@ const marketData: CommandModule = {
         type: 'boolean',
         description: 'Display order book liquidity',
       }),
-  handler: async (argv: MarketDataArgs) => {
+  handler: async (argv) => {
     const connection = createConnection();
-    const provider = createProvider(connection, null); // Stub wallet
+    const wallet = createStubWallet();
+    const provider = createProvider(connection, wallet);
     const client = createClient(provider);
     const marketPubkey = loadPublicKey(argv.market);
 
     try {
-      logger.info(`Loading market: ${marketPubkey.toBase58()}`);
-      const market = await client.loadMarket(marketPubkey);
+      logger.info(`Loading market: ${marketPubkey.toBase58()}...`);
+      const market = await Market.load(client, marketPubkey);
 
+      // Monitor best bid/ask prices
       if (argv.bestbidask) {
         logger.info('Monitoring best bid/ask prices...');
         setInterval(async () => {
           await market.loadOrderBook();
           const bestBid = market.bids?.best();
           const bestAsk = market.asks?.best();
-          logger.info(`Best Bid: ${bestBid?.price} | Best Ask: ${bestAsk?.price}`);
+
+          const bidPrice = bestBid?.price?.toFixed(4) || 'N/A';
+          const askPrice = bestAsk?.price?.toFixed(4) || 'N/A';
+
+          logger.info(`Best Bid: ${bidPrice} | Best Ask: ${askPrice}`);
         }, 1000);
       }
 
+      // Monitor order book liquidity
       if (argv.book) {
         logger.info('Displaying order book liquidity...');
         setInterval(async () => {
           await market.loadOrderBook();
-          const bids = market.bids?.getL2(10) || [];
-          const asks = market.asks?.getL2(10) || [];
-          logger.info(`Order Book: \nBids: ${JSON.stringify(bids)}\nAsks: ${JSON.stringify(asks)}`);
+          console.clear();
+          console.log(
+            'Price (Bid)     | Size (Bid)      | Amount (Bid)    || Price (Ask)     | Size (Ask)      | Amount (Ask)'
+          );
+          console.log(
+            '--------------- | --------------- | --------------- || --------------- | --------------- | ---------------'
+          );
+
+          const depth = 10;
+          const bids = market.bids?.getL2(depth) || [];
+          const asks = market.asks?.getL2(depth) || [];
+
+          for (let i = 0; i < depth; i++) {
+            const bid = bids[i] || [null, null];
+            const ask = asks[i] || [null, null];
+
+            const bidPrice = bid[0]?.toFixed(4) || 'N/A';
+            const bidSize = bid[1]?.toFixed(4) || 'N/A';
+            const bidAmount = bid[0] && bid[1] ? (bid[0] * bid[1]).toFixed(4) : 'N/A';
+
+            const askPrice = ask[0]?.toFixed(4) || 'N/A';
+            const askSize = ask[1]?.toFixed(4) || 'N/A';
+            const askAmount = ask[0] && ask[1] ? (ask[0] * ask[1]).toFixed(4) : 'N/A';
+
+            console.log(
+              `${bidPrice.padEnd(15)} | ${bidSize.padEnd(15)} | ${bidAmount.padEnd(15)} || ${askPrice.padEnd(15)} | ${askSize.padEnd(15)} | ${askAmount.padEnd(15)}`
+            );
+          }
         }, 1000);
       }
     } catch (error) {
-      const err = error as Error;
-      logger.error(`Error fetching market data: ${err.message}`);
-      process.exit(1);
+      logger.error(`Error fetching market data: ${(error as Error).message}`);
     }
   },
 };
