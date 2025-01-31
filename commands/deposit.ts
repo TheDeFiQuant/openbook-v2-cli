@@ -175,11 +175,12 @@ async function sendWithRetry(
   prioritizationFee: bigint
 ): Promise<string> {
   let attempt = 0;
+  let signature: string | null = null;
 
   // Predefined escalation steps for retry attempts
   const baseRetrySteps = [
     250_000n, 500_000n, 1_000_000n, 1_500_000n,
-    2_000_000n, 4_000_000n, 8_000_000n, 16_000_000n, 
+    2_000_000n, 4_000_000n, 8_000_000n, 16_000_000n, 32_000_000n
   ];
 
   while (attempt < MAX_RETRIES) {
@@ -187,23 +188,38 @@ async function sendWithRetry(
       let latestBlockhash = await connection.getLatestBlockhash('confirmed');
       logger.info(`Attempt ${attempt + 1}/${MAX_RETRIES}: Sending transaction with priority fee ${prioritizationFee.toString()} microLamports`);
 
-      const signature = await sendTransaction(provider, instructions, [], {
+      // Send the transaction and store the signature
+      signature = await sendTransaction(provider, instructions, [], {
         preflightCommitment: 'confirmed',
         maxRetries: 0,
         prioritizationFee: Number(prioritizationFee),
         latestBlockhash,
       });
 
-      await connection.confirmTransaction(
-        { signature, blockhash: latestBlockhash.blockhash, lastValidBlockHeight: latestBlockhash.lastValidBlockHeight },
-        'confirmed'
-      );
+      // Check for transaction confirmation
+      const confirmationResult = await confirmTransactionWithPolling(connection, signature);
 
-      logger.info(`Transaction ${signature} confirmed.`);
-      return signature;
+      if (confirmationResult) {
+        logger.info(`Transaction ${signature} confirmed.`);
+        return signature;
+      }
+
+      // If transaction is still pending, allow additional time before retrying
+      logger.warn(`Transaction ${signature} is still pending. Retrying after grace period...`);
+      await new Promise(resolve => setTimeout(resolve, 5000)); // Short grace period
+
     } catch (error: unknown) {
       if (error instanceof Error && error.message.includes('block height exceeded')) {
         attempt++;
+
+        // Before increasing the fee, re-check if the transaction landed
+        if (signature) {
+          const confirmationResult = await confirmTransactionWithPolling(connection, signature);
+          if (confirmationResult) {
+            logger.info(`Transaction ${signature} confirmed after retry check.`);
+            return signature;
+          }
+        }
 
         // Determine next priority fee step
         if (attempt - 1 < baseRetrySteps.length) {
@@ -220,6 +236,30 @@ async function sendWithRetry(
   }
 
   throw new Error('Transaction failed after multiple retries.');
+}
+
+/**
+ * Confirms a transaction using getSignatureStatus() with polling.
+ * This function provides a more reliable confirmation strategy compared to confirmTransaction().
+ */
+async function confirmTransactionWithPolling(connection: Connection, signature: string): Promise<boolean> {
+  const maxChecks = 10; // Number of times to check before giving up
+  const delay = 3000; // Delay between each check in milliseconds
+
+  for (let i = 0; i < maxChecks; i++) {
+    const status = await connection.getSignatureStatus(signature, { searchTransactionHistory: true });
+
+    if (status && status.value) {
+      const confirmationStatus = status.value.confirmationStatus;
+      if (confirmationStatus === 'confirmed' || confirmationStatus === 'finalized') {
+        return true;
+      }
+    }
+
+    await new Promise(resolve => setTimeout(resolve, delay)); // Wait before checking again
+  }
+
+  return false;
 }
 
 export default deposit;
