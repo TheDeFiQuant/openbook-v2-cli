@@ -3,19 +3,19 @@ Openbook CLI v0.1
 Readme to be written...
 
 Working:
-marketData
-balance
-createOOA
-fetchOOA
-deposit
-withdraw
+marketData<br>  
+balance<br>  
+createOOA<br>  
+fetchOOA<br>  
+deposit<br>  
+withdraw<br>  
 
 In Progress:
-placeLimitOrder
-getOrder
+placeLimitOrder<br>  
+getOrder<br>  
 
 To Do:
-closeOOA
-// deal with silent OOA creations when using public rpc endpoints
-cancelOrder
-// port advanced transaction handling from deposit.ts into setup.ts
+closeOOA<br>  
+// deal with silent OOA creations when using public rpc endpoints<br>  
+cancelOrder<br>  
+// port advanced transaction handling from deposit.ts into setup.ts<br>  
