@@ -1,12 +1,12 @@
 /**
- * CLI Command: fetchOOA
+ * CLI Command: getOOA
  * 
  * Description
  * Fetches all OpenOrders accounts and the OpenOrdersIndexer for a given owner. 
  * If a market is specified, it fetches only OpenOrders accounts associated with that market.
  *
  * Example Usage
- * npx ts-node cli.ts fetchOOA <OWNER_PUBLIC_KEY> [--market <MARKET_PUBLIC_KEY>]
+ * npx ts-node cli.ts getOOA <OWNER_PUBLIC_KEY> [--market <MARKET_PUBLIC_KEY>]
  *  
  * Parameters
  * --owner (Required): Public key of the account owner whose OpenOrders accounts are being fetched.
@@ -20,9 +20,9 @@ import { OpenOrders, nameToString } from '@openbook-dex/openbook-v2';
 import logger from '../utils/logger';
 
 /**
- * Interface defining the required arguments for the fetchOOA command.
+ * Interface defining the required arguments for the getOOA command.
  */
-interface FetchOOAArgs {
+interface getOOAArgs {
   owner: string;
   market?: string;
 }
@@ -30,8 +30,8 @@ interface FetchOOAArgs {
 /**
  * Command module to fetch OpenOrders accounts and the OpenOrdersIndexer for a specified owner.
  */
-const fetchOOA: CommandModule<{}, FetchOOAArgs> = {
-  command: 'fetchOOA <owner> [market]',
+const getOOA: CommandModule<{}, getOOAArgs> = {
+  command: 'getOOA <owner> [market]',
   describe: 'Fetch OpenOrders accounts and OpenOrdersIndexer',
   builder: (yargs) =>
     yargs
@@ -112,4 +112,4 @@ const fetchOOA: CommandModule<{}, FetchOOAArgs> = {
   },
 };
 
-export default fetchOOA;
+export default getOOA;

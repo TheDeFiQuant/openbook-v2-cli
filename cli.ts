@@ -43,14 +43,14 @@
  * --quoteAmount (Required): Amount of quote tokens to deposit.
  * 
  * 
- * CLI Command: fetchOOA
+ * CLI Command: getOOA
  * 
  * Description
  * Fetches all OpenOrders accounts and the OpenOrdersIndexer for a given owner. 
  * If a market is specified, it fetches only OpenOrders accounts associated with that market.
  *
  * Example Usage
- * npx ts-node cli.ts fetchOOA <OWNER_PUBLIC_KEY> [--market <MARKET_PUBLIC_KEY>]
+ * npx ts-node cli.ts getOOA <OWNER_PUBLIC_KEY> [--market <MARKET_PUBLIC_KEY>]
  *  
  * Parameters
  * --owner (Required): Public key of the account owner whose OpenOrders accounts are being fetched.
@@ -125,7 +125,7 @@ import { hideBin } from 'yargs/helpers';
 
 import marketData from './commands/marketData';
 import createOOA from './commands/createOOA';
-import fetchOOA from './commands/fetchOOA';
+import getOOA from './commands/getOOA';
 import withdraw from './commands/withdraw';
 import deposit from './commands/deposit';
 import balance from './commands/balance';
@@ -137,7 +137,7 @@ yargs(hideBin(process.argv))
   .usage('$0 <command> [options]')
   .command(marketData)
   .command(createOOA)
-  .command(fetchOOA)
+  .command(getOOA)
   .command(withdraw)
   .command(deposit)
   .command(balance)

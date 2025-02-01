@@ -7,7 +7,7 @@ Working:
 marketData  
 balance  
 createOOA  
-fetchOOA  
+getOOA  
 deposit  
 withdraw  
 placeLimitOrder  
