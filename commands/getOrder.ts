@@ -1,21 +1,30 @@
 import { CommandModule } from 'yargs';
-import { createConnection, createProvider, createClient, loadPublicKey } from '../utils/setup';
+import {
+  createConnection,
+  createClient,
+  createProvider,
+  loadPublicKey,
+  createStubWallet,
+  validateAndFetchMarket
+} from '../utils/setup';
+import { Connection, PublicKey } from '@solana/web3.js';
+import { OpenBookV2Client, Market, OpenOrders } from '@openbook-dex/openbook-v2/';
 import logger from '../utils/logger';
 
-interface GetOrderArgs {
+interface CLIGetOrderArgs {
   wallet?: string;
   openOrders?: string;
   market?: string;
 }
 
-const getOrder: CommandModule = {
-  command: 'getOrder',
-  describe: 'Fetch OpenOrders account or wallet positions',
+const getOrder: CommandModule<{}, CLIGetOrderArgs> = {
+  command: 'position',
+  describe: 'Fetch current position data for an OpenBook trading account',
   builder: (yargs) =>
     yargs
       .option('wallet', {
         type: 'string',
-        description: 'Wallet public key to fetch all orders',
+        description: 'Wallet public key (fetch all orders)',
       })
       .option('openOrders', {
         type: 'string',
@@ -31,32 +40,54 @@ const getOrder: CommandModule = {
         }
         return true;
       }),
-  handler: async (argv: GetOrderArgs) => {
-    const connection = createConnection();
-    const provider = createProvider(connection, null); // Stub wallet
-    const client = createClient(provider);
+  handler: async (argv) => {
+    // Create Solana connection and provider
+    const connection: Connection = createConnection();
+    const stubWallet = createStubWallet();
+    const provider = createProvider(connection, stubWallet);
+    const client: OpenBookV2Client = createClient(provider);
 
     try {
       if (argv.openOrders) {
+        // Fetch a specific OpenOrders account
         const openOrdersPubkey = loadPublicKey(argv.openOrders);
         logger.info(`Fetching OpenOrders account: ${openOrdersPubkey.toBase58()}`);
-        const marketPubkey = argv.market ? loadPublicKey(argv.market) : undefined;
-        const market = marketPubkey ? await client.loadMarket(marketPubkey) : undefined;
 
-        const openOrders = await client.loadOpenOrders(openOrdersPubkey, market);
-        logger.info(`Current Position: ${openOrders.toPrettyString()}`);
+        const marketPubkey = argv.market ? loadPublicKey(argv.market) : undefined;
+        const market = marketPubkey ? await validateAndFetchMarket(connection, client, marketPubkey) : undefined;
+
+        const openOrders = await OpenOrders.load(openOrdersPubkey, market ?? undefined, client);
+        logger.info('Current Position:');
+        logger.info(openOrders.toPrettyString());
       } else if (argv.wallet) {
+        // Fetch all OpenOrders accounts for the wallet
         const walletPubkey = loadPublicKey(argv.wallet);
         logger.info(`Fetching all OpenOrders accounts for wallet: ${walletPubkey.toBase58()}`);
-        const allOrders = await client.findAllOpenOrders(walletPubkey);
-        allOrders.forEach((order) => logger.info(`Order: ${order.toBase58()}`));
+
+        const marketPubkey = argv.market ? loadPublicKey(argv.market) : undefined;
+        const market = marketPubkey ? await validateAndFetchMarket(connection, client, marketPubkey) : undefined;
+
+        const openOrdersList = market
+          ? await OpenOrders.loadNullableForMarketAndOwner(market, walletPubkey)
+          : await client.findAllOpenOrders(walletPubkey);
+
+        if (Array.isArray(openOrdersList)) {
+          for (const openOrdersPubkey of openOrdersList) {
+            const openOrders = await OpenOrders.load(openOrdersPubkey, market ?? undefined, client);
+            logger.info(openOrders.toPrettyString());
+          }
+        } else if (openOrdersList) {
+          logger.info(openOrdersList.toPrettyString());
+        } else {
+          logger.info('No OpenOrders accounts found.');
+        }
       }
     } catch (error) {
-      const err = error as Error;
-      logger.error(`Error fetching OpenOrders: ${err.message}`);
+      logger.error('Error:', error instanceof Error ? error.message : error);
       process.exit(1);
     }
   },
 };
 
 export default getOrder;
+
