@@ -1,3 +1,18 @@
+/**
+ * CLI Command: withdraw
+ * 
+ * Description
+ * Withdraws funds from an OpenOrders account on OpenBook. This allows users to reclaim their base and quote tokens from an active market.
+ *
+ * Example Usage
+ * npx ts-node cli.ts withdraw --market <MARKET_PUBKEY> --openOrders <OPEN_ORDERS_PUBKEY> --ownerKeypair <KEYPAIR_PATH>
+ *  
+ * Parameters
+ * --market (Required): Public key of the market where the OpenOrders account is located.
+ * --openOrders (Required): Public key of the OpenOrders account.
+ * --ownerKeypair (Required): Path to the keypair file of the account owner.
+ */
+
 import { CommandModule } from 'yargs';
 import {
   createConnection,
@@ -51,14 +66,22 @@ const withdraw: CommandModule<{}, WithdrawArgs> = {
         description: 'Path to owner keypair file',
       }),
   handler: async (argv) => {
-    // Initialize Solana connection and load keypair
+    // Establish connection to the Solana blockchain
     const connection: Connection = createConnection();
+
+    // Load the keypair of the account owner
     const owner = loadKeypair(argv.ownerKeypair);
+
+    // Create a wallet instance with the owner's keypair
     const wallet = new Wallet(owner);
+
+    // Create an Anchor provider for blockchain interactions
     const provider = createProvider(connection, wallet);
+
+    // Initialize an OpenBook client
     const client = createClient(provider);
 
-    // Load market and OpenOrders public keys
+    // Load the public keys for market and OpenOrders account
     const marketPubkey = loadPublicKey(argv.market);
     const openOrdersPubkey = loadPublicKey(argv.openOrders);
 
@@ -66,23 +89,23 @@ const withdraw: CommandModule<{}, WithdrawArgs> = {
       logger.info(`Using wallet: ${owner.publicKey.toBase58()}`);
       logger.info(`Market: ${marketPubkey.toBase58()}`);
 
-      // Fetch market data
+      // Fetch and validate market data
       logger.info('Fetching and validating market data...');
       const marketAccount = await validateAndFetchMarket(connection, client, marketPubkey);
 
-      // Deserialize OpenOrders account
+      // Deserialize the OpenOrders account
       logger.info('Deserializing OpenOrders account...');
       const openOrdersAccount = await client.deserializeOpenOrderAccount(openOrdersPubkey);
       if (!openOrdersAccount) {
         throw new Error('OpenOrders account not found.');
       }
 
-      // Ensure OpenOrders account belongs to the specified market
+      // Ensure OpenOrders account is linked to the correct market
       if (openOrdersAccount.market.toBase58() !== marketPubkey.toBase58()) {
         throw new Error('OpenOrders account does not belong to the specified market.');
       }
 
-      // Ensure associated token accounts exist
+      // Ensure that the associated token accounts exist
       logger.info('Ensuring associated token accounts exist...');
       const baseTokenAccount = await ensureAssociatedTokenAccount(
         connection,
@@ -97,7 +120,7 @@ const withdraw: CommandModule<{}, WithdrawArgs> = {
         owner.publicKey
       );
 
-      // Prepare withdrawal instruction
+      // Prepare the withdrawal instruction
       logger.info('Preparing withdrawal instruction...');
       const [withdrawIx, signers] = await client.settleFundsIx(
         openOrdersPubkey,
@@ -106,14 +129,14 @@ const withdraw: CommandModule<{}, WithdrawArgs> = {
         marketAccount,
         baseTokenAccount,
         quoteTokenAccount,
-        null, // Referrer account
-        owner.publicKey // Penalty payer
+        null, // No referrer account specified
+        owner.publicKey // The penalty payer is the owner
       );
 
-      // Fetch dynamic priority fee
+      // Retrieve the dynamic priority fee for transaction processing
       const finalPriorityFee = await getDynamicPriorityFee(connection);
 
-      // Execute withdrawal transaction with retry logic
+      // Execute the transaction with retry logic for better reliability
       const signature = await sendWithRetry(provider, connection, [withdrawIx], finalPriorityFee);
 
       logger.info(`Withdrawal transaction successful. Transaction ID: ${signature}`);

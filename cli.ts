@@ -1,6 +1,8 @@
 /**
- * Command	  Description
- * balance	  Fetches the base and quote token balances for an OpenOrders account on a specified market.
+ * CLI Command: balance	  
+ * 
+ * Description
+ * Fetches the base and quote token balances for an OpenOrders account on a specified market.
  *  
  * Example
  * npx ts-node cli.ts balance --openOrders <OPEN_ORDERS_PUBKEY> --market <MARKET_PUBKEY>
@@ -9,8 +11,11 @@
  * --openOrders: The public key of the OpenOrders account.
  * --market: The public key of the market.
  *  
- * Command	  Description
- * createOOA  Creates an OpenOrders account (OOA) for a specified market, allowing users to manage their trades on OpenBook.
+ *
+ * CLI Command: createOOA  
+ * 
+ * Description
+ * Creates an OpenOrders account (OOA) for a specified market, allowing users to manage their trades on OpenBook.
  * 
  * Example
  * npx ts-node cli.ts createOOA --market <MARKET_PUBKEY> --ownerKeypair <KEYPAIR_FILE_PATH> --name <ACCOUNT_NAME>
@@ -19,6 +24,7 @@
  * --market (Required): Public key of the market where the OpenOrders account will be created.
  * --ownerKeypair (Required): Path to the keypair file of the owner.
  * --name (Optional, default: "default"): Name of the OpenOrders account.
+ * 
  * 
  * CLI Command: deposit
  * 
@@ -50,6 +56,7 @@
  * --owner (Required): Public key of the account owner whose OpenOrders accounts are being fetched.
  * --market (Optional): Public key of the market to filter OpenOrders accounts.
  * 
+ * 
  * CLI Command: position
  * 
  * Description
@@ -66,6 +73,7 @@
  * --openOrders (Optional): Public key of a specific OpenOrders account.
  * --market (Optional): Public key of a market to filter the OpenOrders accounts.
  * 
+ * 
  * CLI Command: marketData
  * 
  * Description
@@ -80,6 +88,35 @@
  * --bestbidask (Optional): Monitor and display the best bid/ask prices.
  * --book (Optional): Display the full order book liquidity.
  * 
+ * 
+ * CLI Command: place-order
+ * 
+ * Description
+ * Places a limit order on OpenBook by specifying the market, order parameters, and OpenOrders account.
+ *
+ * Example Usage
+ * npx ts-node cli.ts place-order --market <MARKET_PUBKEY> --openOrders <OPEN_ORDERS_PUBKEY> --ownerKeypair <KEYPAIR_PATH> --side bid --price 100 --size 1
+ *  
+ * Parameters
+ * --market (Required): Public key of the market where the order will be placed.
+ * --openOrders (Required): Public key of the OpenOrders account.
+ * --ownerKeypair (Required): Path to the keypair file of the order owner.
+ * --side (Required): Order side, either 'bid' (buy) or 'ask' (sell).
+ * --price (Required): Order price in UI units.
+ * --size (Required): Order size in UI units.
+ * 
+ * CLI Command: withdraw
+ * 
+ * Description
+ * Withdraws funds from an OpenOrders account on OpenBook. This allows users to reclaim their base and quote tokens from an active market.
+ *
+ * Example Usage
+ * npx ts-node cli.ts withdraw --market <MARKET_PUBKEY> --openOrders <OPEN_ORDERS_PUBKEY> --ownerKeypair <KEYPAIR_PATH>
+ *  
+ * Parameters
+ * --market (Required): Public key of the market where the OpenOrders account is located.
+ * --openOrders (Required): Public key of the OpenOrders account.
+ * --ownerKeypair (Required): Path to the keypair file of the account owner.
  * 
  */
 
