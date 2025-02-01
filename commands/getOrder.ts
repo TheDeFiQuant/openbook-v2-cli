@@ -1,5 +1,5 @@
 /**
- * CLI Command: position
+ * CLI Command: getOrder
  * 
  * Description
  * Fetches the open orders for an OpenBook trading account. 
@@ -7,8 +7,8 @@
  * If a market is specified, results are filtered to that market.
  *
  * Example Usage
- * npx ts-node cli.ts position --wallet <WALLET_PUBLIC_KEY>
- * npx ts-node cli.ts position --openOrders <OPEN_ORDERS_PUBLIC_KEY> [--market <MARKET_PUBLIC_KEY>]
+ * npx ts-node cli.ts getOrder --wallet <WALLET_PUBLIC_KEY>
+ * npx ts-node cli.ts getOrder --openOrders <OPEN_ORDERS_PUBLIC_KEY> [--market <MARKET_PUBLIC_KEY>]
  *  
  * Parameters
  * --wallet (Optional): Public key of the wallet to fetch all OpenOrders accounts.
@@ -31,7 +31,7 @@ import { OpenBookV2Client, Market, OpenOrders } from '@openbook-dex/openbook-v2/
 import logger from '../utils/logger';
 
 /**
- * Interface defining the arguments for the position command.
+ * Interface defining the arguments for the getOrder command.
  */
 interface CLIGetOrderArgs {
   wallet?: string;
@@ -40,11 +40,11 @@ interface CLIGetOrderArgs {
 }
 
 /**
- * CLI command to fetch the current position data for an OpenBook trading account.
+ * CLI command to fetch the current getOrder data for an OpenBook trading account.
  */
 const getOrder: CommandModule<{}, CLIGetOrderArgs> = {
-  command: 'position',
-  describe: 'Fetch current position data for an OpenBook trading account',
+  command: 'getOrder',
+  describe: 'Fetch current getOrder data for an OpenBook trading account',
   builder: (yargs) =>
     yargs
       .option('wallet', {
@@ -90,7 +90,7 @@ const getOrder: CommandModule<{}, CLIGetOrderArgs> = {
 
         // Load the OpenOrders account details
         const openOrders = await OpenOrders.load(openOrdersPubkey, market ?? undefined, client);
-        logger.info('Current Position:');
+        logger.info('Current getOrder:');
         logger.info(openOrders.toPrettyString());
       } else if (argv.wallet) {
         // Fetch all OpenOrders accounts for the specified wallet

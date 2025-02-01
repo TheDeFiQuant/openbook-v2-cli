@@ -1,11 +1,11 @@
 /**
- * CLI Command: place-order
+ * CLI Command: limitOrder
  * 
  * Description
  * Places a limit order on OpenBook by specifying the market, order parameters, and OpenOrders account.
  *
  * Example Usage
- * npx ts-node cli.ts place-order --market <MARKET_PUBKEY> --openOrders <OPEN_ORDERS_PUBKEY> --ownerKeypair <KEYPAIR_PATH> --side bid --price 100 --size 1
+ * npx ts-node cli.ts limitOrder --market <MARKET_PUBKEY> --openOrders <OPEN_ORDERS_PUBKEY> --ownerKeypair <KEYPAIR_PATH> --side bid --price 100 --size 1
  *  
  * Parameters
  * --market (Required): Public key of the market where the order will be placed.
@@ -33,7 +33,7 @@ import logger from '../utils/logger';
 import { BN } from '@coral-xyz/anchor';
 
 /**
- * Interface defining the required arguments for the place-order command.
+ * Interface defining the required arguments for the limitOrder command.
  */
 interface CLIPlaceOrderArgs {
   market: string;
@@ -48,7 +48,7 @@ interface CLIPlaceOrderArgs {
  * CLI command to place a limit order on OpenBook.
  */
 const placeLimitOrder: CommandModule<{}, CLIPlaceOrderArgs> = {
-  command: 'place-order',
+  command: 'limitOrder',
   describe: 'Place a limit order on OpenBook',
   builder: (yargs) =>
     yargs

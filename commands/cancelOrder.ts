@@ -1,11 +1,11 @@
 /**
- * CLI Command: cancel-order
+ * CLI Command: cancelOrder
  * 
  * Description
  * Cancels an existing order on OpenBook by specifying the market, OpenOrders account, and either an `orderId`, `clientOrderId`, or canceling all orders.
  *
  * Example Usage
- * npx ts-node cli.ts cancel-order --market <MARKET_PUBKEY> --openOrders <OPEN_ORDERS_PUBKEY> --orderId <ORDER_ID> --ownerKeypair <KEYPAIR_PATH>
+ * npx ts-node cli.ts cancelOrder --market <MARKET_PUBKEY> --openOrders <OPEN_ORDERS_PUBKEY> --orderId <ORDER_ID> --ownerKeypair <KEYPAIR_PATH>
  *  
  * Parameters
  * --market (Required): Public key of the market where the order exists.
@@ -33,7 +33,7 @@ import logger from '../utils/logger';
 import { BN } from '@coral-xyz/anchor';
 
 /**
- * Interface defining the required arguments for the cancel-order command.
+ * Interface defining the required arguments for the cancelOrder command.
  */
 interface CLICancelOrderArgs {
   market: string;
@@ -49,7 +49,7 @@ interface CLICancelOrderArgs {
  * CLI command to cancel orders on OpenBook.
  */
 const cancelOrder: CommandModule<{}, CLICancelOrderArgs> = {
-  command: 'cancel-order',
+  command: 'cancelOrder',
   describe: 'Cancel an order on OpenBook',
   builder: (yargs) =>
     yargs
