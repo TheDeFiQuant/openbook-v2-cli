@@ -66,6 +66,20 @@
  * --openOrders (Optional): Public key of a specific OpenOrders account.
  * --market (Optional): Public key of a market to filter the OpenOrders accounts.
  * 
+ * CLI Command: marketData
+ * 
+ * Description
+ * Monitors the order book for a specified market, displaying real-time updates on best bid/ask prices or the full order book liquidity.
+ *
+ * Example Usage
+ * npx ts-node cli.ts marketData <MARKET_PUBLIC_KEY> --bestbidask
+ * npx ts-node cli.ts marketData <MARKET_PUBLIC_KEY> --book
+ *  
+ * Parameters
+ * --market (Required): Public key of the market to monitor.
+ * --bestbidask (Optional): Monitor and display the best bid/ask prices.
+ * --book (Optional): Display the full order book liquidity.
+ * 
  * 
  */
 
