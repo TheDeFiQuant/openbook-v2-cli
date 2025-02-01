@@ -30,7 +30,7 @@ npx ts-node cli.ts <command> [options]
 
 ### Market Data
 
-Monitor the order book for a specified market.
+Monitor the order book for a specified market, chose --bestbidask or --book to watch the orderbook or best bid and ask of a particular market.
 
 ```sh
 npx ts-node cli.ts marketData <MARKET_PUBLIC_KEY> --bestbidask
@@ -45,7 +45,7 @@ npx ts-node cli.ts marketData <MARKET_PUBLIC_KEY> --book
 
 ### Create OpenOrders Account (OOA)
 
-Create an OpenOrders account for a market.
+Create an OpenOrders account (OOA) for a market. First-time traders need an OOA to start trading on OpenBook and to access new markets. You can create multiple OOAs for the same market, allowing you to separate different trading strategies or to separate account activity between discretionary and systematic trading.
 
 ```sh
 npx ts-node cli.ts createOOA --market <MARKET_PUBKEY> --ownerKeypair <KEYPAIR_FILE_PATH> --name <ACCOUNT_NAME>
@@ -59,7 +59,7 @@ npx ts-node cli.ts createOOA --market <MARKET_PUBKEY> --ownerKeypair <KEYPAIR_FI
 
 ### Get OpenOrders Accounts (OOA)
 
-Fetch OpenOrders accounts for an owner.
+Fetch OpenOrders accounts for an owner to validate the creation of your OOA and to check which OOAs you have.
 
 ```sh
 npx ts-node cli.ts getOOA <OWNER_PUBLIC_KEY> [--market <MARKET_PUBLIC_KEY>]
@@ -72,7 +72,7 @@ npx ts-node cli.ts getOOA <OWNER_PUBLIC_KEY> [--market <MARKET_PUBLIC_KEY>]
 
 ### Close OpenOrders Account (OOA)
 
-Close an OpenOrders account or all OOAs for a market.
+Close an OpenOrders account or all OOAs for a market or for one particular OOA. Optionally you can also close the OpenOrdersIndexer.
 
 ```sh
 npx ts-node cli.ts closeOOA --ownerKeypair <KEYPAIR_PATH> --market <MARKET_PUBKEY> --openOrders <OPEN_ORDERS_PUBKEY> --closeIndexer
@@ -87,7 +87,7 @@ npx ts-node cli.ts closeOOA --ownerKeypair <KEYPAIR_PATH> --market <MARKET_PUBKE
 
 ### Deposit Funds
 
-Deposit tokens into an OpenOrders account.
+Deposit tokens into an OpenOrders account. Set Quote or BaseAmount to 0 if you only want to deposit one asset.
 
 ```sh
 npx ts-node cli.ts deposit --market <MARKET_PUBKEY> --openOrders <OPEN_ORDERS_PUBKEY> --ownerKeypair <KEYPAIR_PATH> --baseAmount <BASE_AMOUNT> --quoteAmount <QUOTE_AMOUNT>
@@ -133,7 +133,7 @@ npx ts-node cli.ts withdraw --market <MARKET_PUBKEY> --openOrders <OPEN_ORDERS_P
 Place a limit order on OpenBook.
 
 ```sh
-npx ts-node cli.ts place-order --market <MARKET_PUBKEY> --openOrders <OPEN_ORDERS_PUBKEY> --ownerKeypair <KEYPAIR_PATH> --side bid --price 100 --size 1
+npx ts-node cli.ts place-order --market <MARKET_PUBKEY> --openOrders <OPEN_ORDERS_PUBKEY> --ownerKeypair <KEYPAIR_PATH> --side bid --price <PRICE_AMOUNT> --size <SIZE_AMOUNT>
 ```
 
 | Parameter      | Description                                  | Required |
@@ -147,7 +147,7 @@ npx ts-node cli.ts place-order --market <MARKET_PUBKEY> --openOrders <OPEN_ORDER
 
 ### Get Open Orders
 
-Retrieve open orders for an OpenBook trading account.
+Retrieve all open orders for an OpenBook trading account or for one particular OOA.
 
 ```sh
 npx ts-node cli.ts position --wallet <WALLET_PUBLIC_KEY>
