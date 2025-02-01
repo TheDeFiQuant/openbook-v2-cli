@@ -69,6 +69,7 @@ const closeOOA: CommandModule<{}, CloseOOAArgs> = {
 
     // Load market public key if provided
     const marketPubkey = argv.market ? loadPublicKey(argv.market) : undefined;
+    const market = marketPubkey ? await Market.load(client, marketPubkey) : undefined;
 
     try {
       logger.info(`Fetching OpenOrders accounts for owner: ${owner.publicKey.toBase58()}`);
@@ -107,7 +108,7 @@ const closeOOA: CommandModule<{}, CloseOOAArgs> = {
           const priorityFee = await getDynamicPriorityFee(connection);
 
           // Send the transaction
-          const signature = await sendWithRetry(provider, connection, [closeIx], priorityFee, signers);
+          const signature = await sendWithRetry(provider, connection, [closeIx], priorityFee);
           logger.info(`Closed OpenOrders account: ${openOrdersPubkey.toBase58()} (TX: ${signature})`);
         } catch (error) {
           logger.error(`Failed to close OpenOrders account ${openOrdersPubkey.toBase58()}:`, error);
@@ -116,24 +117,19 @@ const closeOOA: CommandModule<{}, CloseOOAArgs> = {
 
       // Optional: Close the OpenOrders indexer if requested
       if (argv.closeIndexer) {
-        if (!marketPubkey) {
+        if (!market) {
           throw new Error('Market public key is required to close the OpenOrders indexer.');
         }
 
         try {
           logger.info(`Closing OpenOrders indexer for owner: ${owner.publicKey.toBase58()}`);
-
-          // Fetch market account
-          const marketAccount = await Market.load(client, marketPubkey);
-
-          const [closeIndexerIx, signers] = await client.closeOpenOrdersIndexerIx(
-            owner,
-            marketAccount // Pass the correct marketAccount as required by function signature
-          );
+          
+          const marketAccount = market.account
+          const [closeIndexerIx, signers] = await client.closeOpenOrdersIndexerIx(owner, marketAccount);
 
           // Send the transaction
           const priorityFee = await getDynamicPriorityFee(connection);
-          const signature = await sendWithRetry(provider, connection, [closeIndexerIx], priorityFee, signers);
+          const signature = await sendWithRetry(provider, connection, [closeIndexerIx], priorityFee);
 
           logger.info(`Closed OpenOrders indexer (TX: ${signature})`);
         } catch (error) {
