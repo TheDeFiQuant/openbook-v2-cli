@@ -17,8 +17,9 @@ getOrder
 
 To Do:  
 closeOOA  
-// deal with silent OOA creations when using public rpc endpoints  
 cancelOrder  
-// port advanced transaction handling from deposit.ts into setup.ts
-// add advanced transaction handling to other scripts that require sending transactions
+createOOA
+- deal with silent OOA creations when using public rpc endpoints 
+placeLimitOrder
+- add advanced transaction handling and landing
 </p>
