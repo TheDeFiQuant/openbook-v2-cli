@@ -23,7 +23,7 @@ import {
   sendWithRetry,
   getDynamicPriorityFee,
 } from '../utils/setup';
-import { Connection, PublicKey, TransactionInstruction } from '@solana/web3.js';
+import { Connection, PublicKey, TransactionInstruction, Keypair } from '@solana/web3.js';
 import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
 import { OpenBookV2Client, Market } from '@openbook-dex/openbook-v2';
 import logger from '../utils/logger';
@@ -91,11 +91,16 @@ const closeOOA: CommandModule<{}, CloseOOAArgs> = {
 
       for (const openOrdersPubkey of openOrdersAccounts) {
         try {
+          // Fetch OpenOrders indexer
+          const openOrdersIndexer = client.findOpenOrdersIndexer(owner.publicKey);
+
           // Create close OpenOrders account instruction
           logger.info(`Closing OpenOrders account: ${openOrdersPubkey.toBase58()}`);
           const [closeIx, signers] = await client.closeOpenOrdersAccountIx(
             owner,
-            openOrdersPubkey
+            openOrdersPubkey,
+            owner.publicKey, // solDestination is the owner's public key
+            openOrdersIndexer // Pass the indexer
           );
 
           // Get dynamic priority fee for transaction
@@ -111,9 +116,20 @@ const closeOOA: CommandModule<{}, CloseOOAArgs> = {
 
       // Optional: Close the OpenOrders indexer if requested
       if (argv.closeIndexer) {
+        if (!marketPubkey) {
+          throw new Error('Market public key is required to close the OpenOrders indexer.');
+        }
+
         try {
           logger.info(`Closing OpenOrders indexer for owner: ${owner.publicKey.toBase58()}`);
-          const [closeIndexerIx, signers] = await client.closeOpenOrdersIndexerIx(owner);
+
+          // Fetch market account
+          const marketAccount = await Market.load(client, marketPubkey);
+
+          const [closeIndexerIx, signers] = await client.closeOpenOrdersIndexerIx(
+            owner,
+            marketAccount // Pass the correct marketAccount as required by function signature
+          );
 
           // Send the transaction
           const priorityFee = await getDynamicPriorityFee(connection);
