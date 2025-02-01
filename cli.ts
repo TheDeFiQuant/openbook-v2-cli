@@ -50,6 +50,22 @@
  * --owner (Required): Public key of the account owner whose OpenOrders accounts are being fetched.
  * --market (Optional): Public key of the market to filter OpenOrders accounts.
  * 
+ * CLI Command: position
+ * 
+ * Description
+ * Fetches the open orders for an OpenBook trading account. 
+ * Allows retrieving all OpenOrders accounts for a wallet or a specific OpenOrders account.
+ * If a market is specified, results are filtered to that market.
+ *
+ * Example Usage
+ * npx ts-node cli.ts position --wallet <WALLET_PUBLIC_KEY>
+ * npx ts-node cli.ts position --openOrders <OPEN_ORDERS_PUBLIC_KEY> [--market <MARKET_PUBLIC_KEY>]
+ *  
+ * Parameters
+ * --wallet (Optional): Public key of the wallet to fetch all OpenOrders accounts.
+ * --openOrders (Optional): Public key of a specific OpenOrders account.
+ * --market (Optional): Public key of a market to filter the OpenOrders accounts.
+ * 
  * 
  */
 
