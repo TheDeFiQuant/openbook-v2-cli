@@ -24,7 +24,7 @@ import {
   loadPublicKey,
   sendWithRetry,
   getDynamicPriorityFee
-} from '../utils/setup';
+} from '../utils/helper';
 import { getAssociatedTokenAddress } from '@solana/spl-token';
 import { PublicKey, Connection, TransactionInstruction } from '@solana/web3.js';
 import { AnchorProvider, Wallet } from '@coral-xyz/anchor';

@@ -24,7 +24,7 @@ import {
   getDynamicPriorityFee,
   validateAndFetchMarket,
   ensureAssociatedTokenAccount
-} from '../utils/setup';
+} from '../utils/helper';
 import {
   PublicKey,
   Connection,

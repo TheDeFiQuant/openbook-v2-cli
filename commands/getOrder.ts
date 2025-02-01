@@ -25,7 +25,7 @@ import {
   loadPublicKey,
   createStubWallet,
   validateAndFetchMarket
-} from '../utils/setup';
+} from '../utils/helper';
 import { Connection, PublicKey } from '@solana/web3.js';
 import { OpenBookV2Client, Market, OpenOrders } from '@openbook-dex/openbook-v2/';
 import logger from '../utils/logger';

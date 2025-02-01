@@ -25,7 +25,7 @@ import {
   loadPublicKey,
   sendWithRetry,
   getDynamicPriorityFee
-} from '../utils/setup';
+} from '../utils/helper';
 import { getAssociatedTokenAddress } from '@solana/spl-token';
 import { toNative } from '@openbook-dex/openbook-v2';
 import {

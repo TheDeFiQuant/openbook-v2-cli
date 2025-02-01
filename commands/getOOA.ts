@@ -15,7 +15,7 @@
  */
 
 import { CommandModule } from 'yargs';
-import { createConnection, createProvider, createClient, loadPublicKey, createStubWallet } from '../utils/setup';
+import { createConnection, createProvider, createClient, loadPublicKey, createStubWallet } from '../utils/helper';
 import { OpenOrders, nameToString } from '@openbook-dex/openbook-v2';
 import logger from '../utils/logger';
 

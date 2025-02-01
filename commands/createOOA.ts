@@ -22,7 +22,7 @@ import {
   loadPublicKey,
   sendWithRetry,
   getDynamicPriorityFee,
-} from '../utils/setup';
+} from '../utils/helper';
 import { Wallet } from '@coral-xyz/anchor';
 import logger from '../utils/logger';
 import { Connection, PublicKey, TransactionInstruction } from '@solana/web3.js';

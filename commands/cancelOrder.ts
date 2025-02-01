@@ -25,7 +25,7 @@ import {
   loadPublicKey,
   sendWithRetry,
   getDynamicPriorityFee
-} from '../utils/setup';
+} from '../utils/helper';
 import { PublicKey, Connection, TransactionInstruction } from '@solana/web3.js';
 import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
 import { OpenBookV2Client, Market, OpenOrders } from '@openbook-dex/openbook-v2';
