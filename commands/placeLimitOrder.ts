@@ -86,7 +86,7 @@ const placeLimitOrder: CommandModule<{}, CLIPlaceOrderArgs> = {
 
       logger.info('Constructing place order instruction...');
       const args: OpenBookPlaceOrderArgs = {
-        side: argv.side as 'bid' | 'ask', // ✅ Fix: Explicitly cast `argv.side` to 'bid' | 'ask'
+        side: argv.side as 'bid' | 'ask',
         priceLots: priceNative,
         maxBaseLots: sizeNative,
         maxQuoteLotsIncludingFees,
