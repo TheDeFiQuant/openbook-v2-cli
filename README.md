@@ -10,15 +10,13 @@ createOOA
 fetchOOA  
 deposit  
 withdraw  
-
-In Progress:  
 placeLimitOrder  
-getOrder  
+getOrder 
 
 To Do:
-closeOOA  
-cancelOrder  
-createOOA
+- closeOOA  
 - deal with silent OOA creations when using public rpc endpoints 
-test all scripts with public RPC endpoint
+- test all scripts with public RPC endpoint
+- test all scripts functions
+
 </p>
