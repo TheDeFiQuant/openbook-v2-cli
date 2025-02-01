@@ -1,11 +1,11 @@
 /**
- * CLI Command: close-open-orders
+ * CLI Command: closeOOA
  * 
  * Description
- * Closes OpenOrders accounts associated with the specified owner and optionally removes the OpenOrders indexer.
+ * Closes OpenOrders accounts (OOAs) associated with the specified owner and optionally removes the OpenOrders indexer.
  *
  * Example Usage
- * npx ts-node cli.ts close-open-orders --ownerKeypair <KEYPAIR_PATH> --market <MARKET_PUBKEY> --closeIndexer
+ * npx ts-node cli.ts closeOOA --ownerKeypair <KEYPAIR_PATH> --market <MARKET_PUBKEY> --closeIndexer
  *  
  * Parameters
  * --ownerKeypair (Required): Path to the keypair file of the OpenOrders account owner.
@@ -17,17 +17,18 @@ import { CommandModule } from 'yargs';
 import {
   createConnection,
   createClient,
+  createProvider,
   loadKeypair,
   loadPublicKey,
   sendWithRetry,
   getDynamicPriorityFee,
 } from '../utils/setup';
 import { Connection, PublicKey, TransactionInstruction } from '@solana/web3.js';
-import { Wallet } from '@coral-xyz/anchor';
+import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
 import { OpenBookV2Client, Market } from '@openbook-dex/openbook-v2';
 import logger from '../utils/logger';
 
-interface CloseOpenOrdersArgs {
+interface CloseOOAArgs {
   ownerKeypair: string;
   market?: string;
   closeIndexer?: boolean;
@@ -36,8 +37,8 @@ interface CloseOpenOrdersArgs {
 /**
  * CLI command to close OpenOrders accounts and optionally remove the OpenOrders indexer.
  */
-const closeOpenOrders: CommandModule<{}, CloseOpenOrdersArgs> = {
-  command: 'close-open-orders',
+const closeOOA: CommandModule<{}, CloseOOAArgs> = {
+  command: 'closeOOA',
   describe: 'Close OpenOrders accounts and optionally remove OpenOrdersIndexer',
   builder: (yargs) =>
     yargs
@@ -60,8 +61,11 @@ const closeOpenOrders: CommandModule<{}, CloseOpenOrdersArgs> = {
     const owner = loadKeypair(argv.ownerKeypair);
     const wallet = new Wallet(owner);
 
+    // Create an Anchor provider
+    const provider = createProvider(connection, wallet);
+
     // Initialize OpenBook client
-    const client = createClient(wallet);
+    const client = createClient(provider);
 
     // Load market public key if provided
     const marketPubkey = argv.market ? loadPublicKey(argv.market) : undefined;
@@ -98,7 +102,7 @@ const closeOpenOrders: CommandModule<{}, CloseOpenOrdersArgs> = {
           const priorityFee = await getDynamicPriorityFee(connection);
 
           // Send the transaction
-          const signature = await sendWithRetry(wallet, connection, [closeIx], priorityFee, signers);
+          const signature = await sendWithRetry(provider, connection, [closeIx], priorityFee, signers);
           logger.info(`Closed OpenOrders account: ${openOrdersPubkey.toBase58()} (TX: ${signature})`);
         } catch (error) {
           logger.error(`Failed to close OpenOrders account ${openOrdersPubkey.toBase58()}:`, error);
@@ -109,11 +113,11 @@ const closeOpenOrders: CommandModule<{}, CloseOpenOrdersArgs> = {
       if (argv.closeIndexer) {
         try {
           logger.info(`Closing OpenOrders indexer for owner: ${owner.publicKey.toBase58()}`);
-          const [closeIndexerIx, signers] = await client.closeOpenOrdersIndexerIx(owner, marketPubkey);
+          const [closeIndexerIx, signers] = await client.closeOpenOrdersIndexerIx(owner);
 
           // Send the transaction
           const priorityFee = await getDynamicPriorityFee(connection);
-          const signature = await sendWithRetry(wallet, connection, [closeIndexerIx], priorityFee, signers);
+          const signature = await sendWithRetry(provider, connection, [closeIndexerIx], priorityFee, signers);
 
           logger.info(`Closed OpenOrders indexer (TX: ${signature})`);
         } catch (error) {
@@ -129,4 +133,4 @@ const closeOpenOrders: CommandModule<{}, CloseOpenOrdersArgs> = {
   },
 };
 
-export default closeOpenOrders;
+export default closeOOA;
