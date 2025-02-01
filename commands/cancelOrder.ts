@@ -107,13 +107,12 @@ const cancelOrder: CommandModule<{}, CLICancelOrderArgs> = {
 
       // Prepare transaction instruction for order cancellation
       let cancelIx: TransactionInstruction;
-      let signers = [];
 
       if (argv.orderId) {
         // Cancel a specific order by order ID
         logger.info(`Cancelling order with ID: ${argv.orderId}`);
         const orderIdBN = new BN(argv.orderId);
-        [cancelIx, signers] = await client.cancelOrderByIdIx(
+        [cancelIx] = await client.cancelOrderByIdIx(
           openOrdersPubkey,
           openOrdersAccount,
           market.account,
@@ -123,7 +122,7 @@ const cancelOrder: CommandModule<{}, CLICancelOrderArgs> = {
         // Cancel a specific order by clientOrderId
         logger.info(`Cancelling order with Client Order ID: ${argv.clientOrderId}`);
         const clientOrderIdBN = new BN(argv.clientOrderId);
-        [cancelIx, signers] = await client.cancelOrderByClientIdIx(
+        [cancelIx] = await client.cancelOrderByClientIdIx(
           openOrdersPubkey,
           openOrdersAccount,
           market.account,
@@ -132,7 +131,7 @@ const cancelOrder: CommandModule<{}, CLICancelOrderArgs> = {
       } else {
         // Cancel all orders or all orders of a specific side
         logger.info(`Cancelling all orders${argv.side ? ` on ${argv.side} side` : ''}`);
-        [cancelIx, signers] = await client.cancelAllOrdersIx(
+        [cancelIx] = await client.cancelAllOrdersIx(
           openOrdersPubkey,
           openOrdersAccount,
           market.account,
@@ -145,7 +144,7 @@ const cancelOrder: CommandModule<{}, CLICancelOrderArgs> = {
       const finalPriorityFee = await getDynamicPriorityFee(connection);
 
       // Execute transaction with retry logic
-      const signature = await sendWithRetry(provider, connection, [cancelIx], finalPriorityFee, signers);
+      const signature = await sendWithRetry(provider, connection, [cancelIx], finalPriorityFee);
 
       logger.info(`Order cancellation successful. Transaction Signature: ${signature}`);
     } catch (error) {
