@@ -2,14 +2,15 @@
  * CLI Command: closeOOA
  * 
  * Description
- * Closes OpenOrders accounts (OOAs) associated with the specified owner and optionally removes the OpenOrders indexer.
+ * Closes an OpenOrders account (OOA) associated with the specified owner. If no specific OpenOrders account is provided, it will close all OOAs on the specified market. Optionally, it can also remove the OpenOrders indexer.
  *
  * Example Usage
- * npx ts-node cli.ts closeOOA --ownerKeypair <KEYPAIR_PATH> --market <MARKET_PUBKEY> --closeIndexer
+ * npx ts-node cli.ts closeOOA --ownerKeypair <KEYPAIR_PATH> --market <MARKET_PUBKEY> --openOrders <OPEN_ORDERS_PUBKEY> --closeIndexer
  *  
  * Parameters
  * --ownerKeypair (Required): Path to the keypair file of the OpenOrders account owner.
- * --market (Optional): Public key of the market. If provided, only closes OpenOrders accounts for this market.
+ * --market (Required): Public key of the market.
+ * --openOrders (Optional): Public key of a specific OpenOrders account to close.
  * --closeIndexer (Optional): If set, also closes the OpenOrders indexer after closing all OpenOrders accounts.
  */
 
@@ -30,7 +31,8 @@ import logger from '../utils/logger';
 
 interface CloseOOAArgs {
   ownerKeypair: string;
-  market?: string;
+  market: string;
+  openOrders?: string;
   closeIndexer?: boolean;
 }
 
@@ -39,7 +41,7 @@ interface CloseOOAArgs {
  */
 const closeOOA: CommandModule<{}, CloseOOAArgs> = {
   command: 'closeOOA',
-  describe: 'Close OpenOrders accounts and optionally remove OpenOrdersIndexer',
+  describe: 'Close an OpenOrders account or all accounts for a market. Optionally remove OpenOrdersIndexer.',
   builder: (yargs) =>
     yargs
       .option('ownerKeypair', {
@@ -49,7 +51,12 @@ const closeOOA: CommandModule<{}, CloseOOAArgs> = {
       })
       .option('market', {
         type: 'string',
-        description: 'Market public key (optional, only closes accounts for this market)',
+        demandOption: true,
+        description: 'Market public key (required)',
+      })
+      .option('openOrders', {
+        type: 'string',
+        description: 'Specific OpenOrders account public key to close (optional)',
       })
       .option('closeIndexer', {
         type: 'boolean',
@@ -60,39 +67,38 @@ const closeOOA: CommandModule<{}, CloseOOAArgs> = {
     const connection: Connection = createConnection();
     const owner = loadKeypair(argv.ownerKeypair);
     const wallet = new Wallet(owner);
-
-    // Create an Anchor provider
     const provider = createProvider(connection, wallet);
-
-    // Initialize OpenBook client
     const client = createClient(provider);
 
-    // Load market public key if provided
-    const marketPubkey = argv.market ? loadPublicKey(argv.market) : undefined;
-    const market = marketPubkey ? await Market.load(client, marketPubkey) : undefined;
+    // Load market public key and market data
+    const marketPubkey = loadPublicKey(argv.market);
+    const market = await Market.load(client, marketPubkey);
+    const marketAccount = market.account;
 
     try {
       logger.info(`Fetching OpenOrders accounts for owner: ${owner.publicKey.toBase58()}`);
 
-      let openOrdersAccounts: PublicKey[];
+      let openOrdersAccounts: PublicKey[] = [];
 
-      if (marketPubkey) {
-        logger.info(`Filtering OpenOrders accounts for market: ${marketPubkey.toBase58()}`);
-        openOrdersAccounts = await client.findOpenOrdersForMarket(owner.publicKey, marketPubkey);
+      if (argv.openOrders) {
+        // If a specific OpenOrders account is provided, only close that one
+        openOrdersAccounts = [loadPublicKey(argv.openOrders)];
+        logger.info(`Closing specific OpenOrders account: ${argv.openOrders}`);
       } else {
-        openOrdersAccounts = await client.findAllOpenOrders(owner.publicKey);
-      }
+        // Otherwise, close all OpenOrders accounts for the given market
+        logger.info(`Fetching all OpenOrders accounts for market: ${marketPubkey.toBase58()}`);
+        openOrdersAccounts = await client.findOpenOrdersForMarket(owner.publicKey, marketPubkey);
 
-      if (openOrdersAccounts.length === 0) {
-        logger.info('No OpenOrders accounts found.');
-        return;
+        if (openOrdersAccounts.length === 0) {
+          logger.info('No OpenOrders accounts found.');
+          return;
+        }
+        logger.info(`Found ${openOrdersAccounts.length} OpenOrders accounts. Closing them...`);
       }
-
-      logger.info(`Found ${openOrdersAccounts.length} OpenOrders accounts. Closing them...`);
 
       for (const openOrdersPubkey of openOrdersAccounts) {
         try {
-          // Fetch OpenOrders indexer
+          // Find the OpenOrders indexer
           const openOrdersIndexer = client.findOpenOrdersIndexer(owner.publicKey);
 
           // Create close OpenOrders account instruction
@@ -101,7 +107,7 @@ const closeOOA: CommandModule<{}, CloseOOAArgs> = {
             owner,
             openOrdersPubkey,
             owner.publicKey, // solDestination is the owner's public key
-            openOrdersIndexer // Pass the indexer
+            openOrdersIndexer
           );
 
           // Get dynamic priority fee for transaction
@@ -117,14 +123,9 @@ const closeOOA: CommandModule<{}, CloseOOAArgs> = {
 
       // Optional: Close the OpenOrders indexer if requested
       if (argv.closeIndexer) {
-        if (!market) {
-          throw new Error('Market public key is required to close the OpenOrders indexer.');
-        }
-
         try {
           logger.info(`Closing OpenOrders indexer for owner: ${owner.publicKey.toBase58()}`);
           
-          const marketAccount = market.account
           const [closeIndexerIx, signers] = await client.closeOpenOrdersIndexerIx(owner, marketAccount);
 
           // Send the transaction
