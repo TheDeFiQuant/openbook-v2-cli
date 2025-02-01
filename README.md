@@ -1,15 +1,21 @@
 # OpenBook CLI
 
-OpenBook CLI is a command-line tool for interacting with OpenBook v2 on Solana. It provides functionalities to manage OpenOrders accounts, monitor markets, place and cancel orders, deposit and withdraw funds, and more.
+OpenBook CLI is a command-line tool for interacting with OpenBook v2. It provides functionalities to create and close trading and market accounts (via create and close OOA), monitor market data, place, cancel and check orders, deposit and withdraw funds, and check your account balance.
 
 ## Installation
 
-Ensure you have Node.js installed. Then, clone this repository and install dependencies:
+Ensure you have Node.js and yarn installed. Then, clone this repository and install dependencies:
 
 ```sh
 git clone https://github.com/QuanDeFi/openbook-cli.git
 cd openbook-cli
 yarn install
+```
+
+and subsequently build the CLI
+
+```sh
+yarn build
 ```
 
 ## Usage
@@ -162,8 +168,6 @@ Cancel an open order on OpenBook.
 npx ts-node cli.ts cancelOrder --market <MARKET_PUBKEY> --openOrders <OPEN_ORDERS_PUBKEY> --orderId <ORDER_ID> --ownerKeypair <KEYPAIR_PATH>
 ```
 
-## Parameters
-
 | Parameter       | Description                               | Required |
 |---------------|-------------------------------------------|----------|
 | `market`      | Public key of the market                 | Yes      |
@@ -173,22 +177,6 @@ npx ts-node cli.ts cancelOrder --market <MARKET_PUBKEY> --openOrders <OPEN_ORDER
 | `side`        | `bid` or `ask` (cancel orders on that side) | No       |
 | `limit`       | Maximum number of orders to cancel       | No       |
 | `ownerKeypair` | Path to the keypair file of the owner   | Yes      |
-
-## Development
-
-### Build the CLI
-
-```sh
-yarn build
-```
-
-### Run Tests
-
-To run the test suite, use the following command:
-
-```sh
-yarn test
-```
 
 ## License
 
