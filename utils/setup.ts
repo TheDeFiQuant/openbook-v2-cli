@@ -179,7 +179,7 @@ export async function sendWithRetry(
  */
 export async function confirmTransactionWithPolling(connection: Connection, signature: string): Promise<boolean> {
   const maxChecks = 10; // Number of times to check before giving up
-  const delay = 3000; // Delay between each check in milliseconds
+  const delay = 2000; // Delay between each check in milliseconds
 
   for (let i = 0; i < maxChecks; i++) {
     const status = await connection.getSignatureStatus(signature, { searchTransactionHistory: true });
@@ -187,12 +187,12 @@ export async function confirmTransactionWithPolling(connection: Connection, sign
     if (status && status.value) {
       const confirmationStatus = status.value.confirmationStatus;
       if (confirmationStatus === 'confirmed' || confirmationStatus === 'finalized') {
-        return true;
+        return true; // Transaction confirmed
       }
     }
 
     await new Promise(resolve => setTimeout(resolve, delay)); // Wait before checking again
   }
 
-  return false;
+  return false; // Transaction not confirmed within maxChecks
 }
