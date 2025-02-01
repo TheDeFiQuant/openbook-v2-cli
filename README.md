@@ -44,3 +44,16 @@ Create an OpenOrders account for a market.
 ```sh
 npx ts-node cli.ts createOOA --market <MARKET_PUBKEY> --ownerKeypair <KEYPAIR_FILE_PATH> --name <ACCOUNT_NAME>
 ```
+
+| Parameter      | Description                                       | Required |
+|--------------|---------------------------------------------------|----------|
+| `market`    | Public key of the market                          | Yes      |
+| `ownerKeypair` | Path to the keypair file of the owner           | Yes      |
+| `name`      | Name of the OpenOrders account (default: `"default"`) | No       |
+
+### Get OpenOrders Accounts (OOA)
+
+Fetch OpenOrders accounts for an owner.
+
+```sh
+npx ts-node cli.ts getOOA <OWNER_PUBLIC_KEY> [--market <MARKET_PUBLIC_KEY>]
