@@ -1,4 +1,4 @@
-import { Connection, Keypair, PublicKey, TransactionInstruction } from '@solana/web3.js';
+import { Connection, Keypair, PublicKey, TransactionInstruction, Transaction } from '@solana/web3.js';
 import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
 import fs from 'fs';
 import { Buffer } from 'buffer';
@@ -6,9 +6,10 @@ import { OpenBookV2Client } from '@openbook-dex/openbook-v2';
 import { RPC_CONFIG, PROGRAM_IDS } from './config';
 import logger from './logger';
 import { sendTransaction } from '@openbook-dex/openbook-v2/dist/cjs/utils/rpc';
+import { TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID, getAssociatedTokenAddress, createAssociatedTokenAccountIdempotentInstruction } from '@solana/spl-token';
 
 // Constants
-const BASE_PRIORITY_FEE = BigInt(10_000); // Minimum priority fee
+const BASE_PRIORITY_FEE = BigInt(100_000); // Minimum priority fee
 const MAX_RETRIES = 10; // Maximum retry attempts for transactions
 
 // Initialize Solana Connection
@@ -179,7 +180,7 @@ export async function sendWithRetry(
  */
 export async function confirmTransactionWithPolling(connection: Connection, signature: string): Promise<boolean> {
   const maxChecks = 10; // Number of times to check before giving up
-  const delay = 2000; // Delay between each check in milliseconds
+  const delay = 1500; // Delay between each check in milliseconds
 
   for (let i = 0; i < maxChecks; i++) {
     const status = await connection.getSignatureStatus(signature, { searchTransactionHistory: true });
@@ -195,4 +196,67 @@ export async function confirmTransactionWithPolling(connection: Connection, sign
   }
 
   return false; // Transaction not confirmed within maxChecks
+}
+
+/**
+ * Fetch and validate market data from Solana RPC.
+ * @param connection Solana connection object.
+ * @param client OpenBookV2 client instance.
+ * @param marketPubkey Public key of the market.
+ * @returns Decoded market data.
+ */
+export async function validateAndFetchMarket(
+  connection: Connection,
+  client: OpenBookV2Client, 
+  marketPubkey: PublicKey
+): Promise<any> {
+  const marketDataRaw = await connection.getAccountInfo(marketPubkey);
+  if (!marketDataRaw || !marketDataRaw.data) {
+    throw new Error('Market data not found.');
+  }
+  logger.info(`Market data for ${marketPubkey.toBase58()} fetched successfully.`);
+  return client.decodeMarket(marketDataRaw.data);
+}
+
+/**
+ * Ensures an Associated Token Account (ATA) exists for a given mint and wallet.
+ * If the ATA does not exist, it creates one.
+ * @param connection Solana connection object.
+ * @param owner Owner keypair.
+ * @param mint Token mint public key.
+ * @param walletPublicKey Wallet public key to associate the token account with.
+ * @returns Public key of the associated token account.
+ */
+export async function ensureAssociatedTokenAccount(
+  connection: Connection,
+  payer: Keypair, // Payer funds and signs the transaction
+  mint: PublicKey,
+  owner: PublicKey // Owner is just a PublicKey
+): Promise<PublicKey> {
+  const ata = await getAssociatedTokenAddress(mint, owner, true);
+  const ataInfo = await connection.getAccountInfo(ata);
+
+  if (!ataInfo) {
+    logger.info(`Creating associated token account for mint: ${mint.toBase58()}`);
+
+    // Construct the ATA creation instruction
+    const createAtaIx: TransactionInstruction = createAssociatedTokenAccountIdempotentInstruction(
+      payer.publicKey, // Payer of fees
+      ata,             // Associated Token Account address
+      owner,           // Owner of the ATA
+      mint,            // Token Mint
+      TOKEN_PROGRAM_ID,
+      ASSOCIATED_TOKEN_PROGRAM_ID
+    );
+
+    // Send the transaction with the payer signing
+    const transaction = new Transaction().add(createAtaIx);
+    const signature = await connection.sendTransaction(transaction, [payer], { skipPreflight: false });
+
+    logger.info(`ATA created successfully. Transaction ID: ${signature}`);
+  } else {
+    logger.info(`Associated token account already exists for mint: ${mint.toBase58()}`);
+  }
+
+  return ata;
 }
