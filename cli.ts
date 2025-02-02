@@ -44,17 +44,21 @@
  * 
  * CLI Command: closeOOA
  * 
- * Description
- * Closes an OpenOrders account (OOA) associated with the specified owner. If no specific OpenOrders account is provided, it will close all OOAs on the specified market. Optionally, it can also remove the OpenOrders indexer.
+ * Description:
+ * - If --openOrders is provided, closes the specified OpenOrders account.
+ * - If --market is provided, closes all OpenOrders accounts for that market.
+ * - If --closeIndexer is provided, closes the OpenOrders indexer (only after all OpenOrders are closed).
  *
- * Example Usage
- * npx ts-node cli.ts closeOOA --ownerKeypair <KEYPAIR_PATH> --market <MARKET_PUBKEY> --openOrders <OPEN_ORDERS_PUBKEY> --closeIndexer
- *  
- * Parameters
+ * Example Usage:
+ * npx ts-node cli.ts closeOOA --ownerKeypair <KEYPAIR_PATH> --openOrders <OPEN_ORDERS_PUBKEY>
+ * npx ts-node cli.ts closeOOA --ownerKeypair <KEYPAIR_PATH> --market <MARKET_PUBKEY>
+ * npx ts-node cli.ts closeOOA --ownerKeypair <KEYPAIR_PATH> --closeIndexer
+ *
+ * Parameters:
  * --ownerKeypair (Required): Path to the keypair file of the OpenOrders account owner.
- * --market (Required): Public key of the market.
+ * --market (Optional): Public key of the market (required if closing all OpenOrders accounts for a market).
  * --openOrders (Optional): Public key of a specific OpenOrders account to close.
- * --closeIndexer (Optional): If set, also closes the OpenOrders indexer after closing all OpenOrders accounts.
+ * --closeIndexer (Optional): If set, closes the OpenOrders indexer.
  * 
  * 
  * CLI Command: deposit
@@ -160,11 +164,13 @@ import { hideBin } from 'yargs/helpers';
 import marketData from './commands/marketData';
 import createOOA from './commands/createOOA';
 import getOOA from './commands/getOOA';
+import closeOOA from './commands/closeOOA';
 import withdraw from './commands/withdraw';
 import deposit from './commands/deposit';
 import balance from './commands/balance';
 import placeLimitOrder from './commands/placeLimitOrder';
 import getOrder from './commands/getOrder';
+import cancelOrder from './commands/cancelOrder';
 
 yargs(hideBin(process.argv))
   .scriptName('openbook-cli')
@@ -172,11 +178,13 @@ yargs(hideBin(process.argv))
   .command(marketData)
   .command(createOOA)
   .command(getOOA)
+  .command(closeOOA)
   .command(withdraw)
   .command(deposit)
   .command(balance)
   .command(placeLimitOrder)
   .command(getOrder)
+  .command(cancelOrder)
   .demandCommand(1, 'Please provide a valid command.')
   .help()
   .alias('help', 'h')
