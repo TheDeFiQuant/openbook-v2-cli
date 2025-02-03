@@ -2,13 +2,27 @@ import { createLogger, format, transports } from 'winston';
 
 // Custom format to ensure full error details are logged
 const errorFormat = format((info) => {
+  // If the info itself is an Error, attach its properties
   if (info instanceof Error) {
     return {
       ...info,
       message: info.message,
       stack: info.stack,
-      details: JSON.stringify(info, null, 2), // Ensure full error details are logged
+      details: JSON.stringify(info, Object.getOwnPropertyNames(info), 2),
     };
+  }
+  
+  // Check if extra meta (splat) contains an Error object
+  const splat = info[Symbol.for('splat')] as unknown[] | undefined;
+  if (splat && Array.isArray(splat) && splat.length > 0 && splat[0] instanceof Error) {
+    info.details = JSON.stringify(splat[0], Object.getOwnPropertyNames(splat[0]), 2);
+    info.stack = splat[0].stack;
+  }
+  
+  // Also, if an 'error' property exists and is an Error, attach its details
+  if (info.error instanceof Error) {
+    info.details = JSON.stringify(info.error, Object.getOwnPropertyNames(info.error), 2);
+    info.stack = info.error.stack;
   }
   return info;
 });
