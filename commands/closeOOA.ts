@@ -25,7 +25,7 @@ import {
   createProvider,
   loadKeypair,
   loadPublicKey,
-  sendWithRetry, // NOTE: Ensure that sendWithRetry is updated to throw the raw error object.
+  sendWithRetry,
   getDynamicPriorityFee,
 } from '../utils/helper';
 import { Connection, PublicKey, TransactionInstruction, Keypair } from '@solana/web3.js';
@@ -65,8 +65,7 @@ const closeOOA: CommandModule<{}, CloseOOAArgs> = {
       })
       .option('openOrders', {
         type: 'string',
-        description:
-          'Specific OpenOrders account public key to close (optional)',
+        description: 'Specific OpenOrders account public key to close (optional)',
       })
       .option('closeIndexer', {
         type: 'boolean',
@@ -74,13 +73,13 @@ const closeOOA: CommandModule<{}, CloseOOAArgs> = {
           'Close the OpenOrders indexer (only one per owner, shared across all markets)',
       }),
   handler: async (argv) => {
-    // Initialize Solana connection and load the owner keypair
+    // Initialize the Solana connection and load the owner's keypair.
     const connection: Connection = createConnection();
     const owner = loadKeypair(argv.ownerKeypair);
     const wallet = new Wallet(owner);
     const provider = createProvider(connection, wallet);
     const client = createClient(provider);
-    const programId = client.program.programId; // Extract program ID
+    const programId = client.program.programId;
 
     try {
       if (argv.openOrders) {
@@ -88,7 +87,9 @@ const closeOOA: CommandModule<{}, CloseOOAArgs> = {
         const openOrdersPubkey = loadPublicKey(argv.openOrders);
         logger.info(`Closing OpenOrders account: ${openOrdersPubkey.toBase58()}`);
 
+        // Derive the OpenOrders indexer PDA for the owner.
         const openOrdersIndexer = findOpenOrdersIndexer(owner.publicKey, programId);
+        // Build the instruction and signers for closing the account.
         const [closeIx, signers] = await client.closeOpenOrdersAccountIx(
           owner,
           openOrdersPubkey,
@@ -97,11 +98,9 @@ const closeOOA: CommandModule<{}, CloseOOAArgs> = {
         );
 
         const priorityFee = await getDynamicPriorityFee(connection);
-        // sendWithRetry is now assumed to throw the raw error object (without wrapping it)
+        // Attempt to send the transaction (sendWithRetry now throws the raw error if it fails)
         const signature = await sendWithRetry(provider, connection, [closeIx], priorityFee);
-        logger.info(
-          `Closed OpenOrders account: ${openOrdersPubkey.toBase58()} (TX: ${signature})`
-        );
+        logger.info(`Closed OpenOrders account: ${openOrdersPubkey.toBase58()} (TX: ${signature})`);
         return;
       } else if (argv.market) {
         // Close all OpenOrders accounts for a specific market
@@ -117,11 +116,10 @@ const closeOOA: CommandModule<{}, CloseOOAArgs> = {
           return;
         }
 
-        logger.info(
-          `Found ${openOrdersAccounts.length} OpenOrders accounts. Closing them...`
-        );
+        logger.info(`Found ${openOrdersAccounts.length} OpenOrders accounts. Closing them...`);
         for (const openOrdersPubkey of openOrdersAccounts) {
           try {
+            // For each OpenOrders account, derive the indexer and attempt to close it.
             const openOrdersIndexer = findOpenOrdersIndexer(owner.publicKey, programId);
             logger.info(`Closing OpenOrders account: ${openOrdersPubkey.toBase58()}`);
 
@@ -134,24 +132,18 @@ const closeOOA: CommandModule<{}, CloseOOAArgs> = {
 
             const priorityFee = await getDynamicPriorityFee(connection);
             const signature = await sendWithRetry(provider, connection, [closeIx], priorityFee);
-            logger.info(
-              `Closed OpenOrders account: ${openOrdersPubkey.toBase58()} (TX: ${signature})`
-            );
+            logger.info(`Closed OpenOrders account: ${openOrdersPubkey.toBase58()} (TX: ${signature})`);
           } catch (error) {
-            logger.error(
-              `Failed to close OpenOrders account ${openOrdersPubkey.toBase58()}:`,
-              { error }
-            );
+            // Log a friendly message and process the error via our custom error handler.
+            logger.error(`Failed to close OpenOrders account ${openOrdersPubkey.toBase58()}.`);
             handleOpenBookError(error);
-            // Continue processing remaining accounts without throwing
+            // Continue processing remaining accounts.
           }
         }
         return;
       } else if (argv.closeIndexer) {
         // Close the OpenOrders indexer
-        logger.info(
-          `Closing OpenOrders indexer for owner: ${owner.publicKey.toBase58()}`
-        );
+        logger.info(`Closing OpenOrders indexer for owner: ${owner.publicKey.toBase58()}`);
 
         try {
           const openOrdersIndexer = findOpenOrdersIndexer(owner.publicKey, programId);
@@ -162,31 +154,25 @@ const closeOOA: CommandModule<{}, CloseOOAArgs> = {
             openOrdersIndexer
           );
           const priorityFee = await getDynamicPriorityFee(connection);
-          const signature = await sendWithRetry(
-            provider,
-            connection,
-            [closeIndexerIx],
-            priorityFee
-          );
-
+          const signature = await sendWithRetry(provider, connection, [closeIndexerIx], priorityFee);
           logger.info(`Closed OpenOrders indexer (TX: ${signature})`);
           return;
         } catch (error) {
-          logger.error(`Failed to close OpenOrders indexer:`, { error });
+          logger.error(`Failed to close OpenOrders indexer.`);
           handleOpenBookError(error);
-          // Rethrow the raw error so that its structure is preserved
-          throw error;
+          // On a critical failure in closing the indexer, log a friendly message and exit.
+          process.exit(1);
         }
       } else {
-        throw new Error(
-          'Invalid command: Provide either --openOrders, --market, or --closeIndexer'
-        );
+        // If none of the valid options are provided, log an error and exit.
+        logger.error('Invalid command: Provide either --openOrders, --market, or --closeIndexer.');
+        process.exit(1);
       }
     } catch (error) {
-      logger.error('Unexpected error occurred:', { error });
+      // Log a generic error message (without printing the raw error details) and exit.
+      logger.error('An unexpected error occurred. Please check the logs for details.');
       handleOpenBookError(error);
-      // Rethrow the raw error for proper upstream handling
-      throw error;
+      process.exit(1);
     }
   },
 };
@@ -194,37 +180,35 @@ const closeOOA: CommandModule<{}, CloseOOAArgs> = {
 export default closeOOA;
 
 /**
- * Parses OpenBook errors and displays human-readable messages.
- * Returns `true` if an OpenBook error was handled, `false` otherwise.
+ * Parses OpenBook errors and logs a human-readable message.
+ * Returns `true` if an OpenBook error was identified and handled; otherwise, returns false.
  */
 function handleOpenBookError(error: any): boolean {
   try {
     if (!error || typeof error !== 'object') {
-      logger.error(`Invalid error format: ${JSON.stringify(error, null, 2)}`);
+      logger.error(`Invalid error format.`);
       return false;
     }
 
+    // Check if the error contains an InstructionError field.
     if (error?.err?.InstructionError) {
       const [_, errorData] = error.err.InstructionError;
-
       if (typeof errorData === 'object' && errorData !== null && 'Custom' in errorData) {
         const errorCode = errorData.Custom;
         const errorMessage = getOpenBookErrorMessage(errorCode);
-
         logger.error(`OpenBook Error (${errorCode}): ${errorMessage}`);
-        return true; // The error was identified and logged
+        return true;
       }
     }
-
-    return false; // Not an OpenBook error, allow generic logging
+    return false;
   } catch (e) {
-    logger.error('Error processing OpenBook error:', { error: e });
+    logger.error('Error processing OpenBook error.');
     return false;
   }
 }
 
 /**
- * Finds the OpenOrdersIndexer PDA for an owner.
+ * Derives the OpenOrdersIndexer PDA for a given owner.
  */
 function findOpenOrdersIndexer(owner: PublicKey, programId: PublicKey): PublicKey {
   return PublicKey.findProgramAddressSync(
@@ -234,7 +218,7 @@ function findOpenOrdersIndexer(owner: PublicKey, programId: PublicKey): PublicKe
 }
 
 /**
- * Constructs the transaction instruction to close the OpenOrders Indexer.
+ * Constructs the transaction instruction to close the OpenOrders indexer.
  */
 async function closeOpenOrdersIndexerIx(
   owner: Keypair,
@@ -252,6 +236,5 @@ async function closeOpenOrdersIndexerIx(
     programId,
     data: Buffer.alloc(0),
   });
-
   return [ix, [owner]];
 }
