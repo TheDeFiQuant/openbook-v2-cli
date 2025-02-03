@@ -31,6 +31,7 @@ import {
 import { Connection, PublicKey, TransactionInstruction, Keypair } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
+import { getOpenBookErrorMessage } from '../utils/error';
 import logger from '../utils/logger';
 
 /**
@@ -75,6 +76,7 @@ const closeOOA: CommandModule<{}, CloseOOAArgs> = {
     const wallet = new Wallet(owner);
     const provider = createProvider(connection, wallet);
     const client = createClient(provider);
+    const programId = client.program.programId; // Extract program ID
 
     try {
       if (argv.openOrders) {
@@ -82,7 +84,7 @@ const closeOOA: CommandModule<{}, CloseOOAArgs> = {
         const openOrdersPubkey = loadPublicKey(argv.openOrders);
         logger.info(`Closing OpenOrders account: ${openOrdersPubkey.toBase58()}`);
 
-        const openOrdersIndexer = findOpenOrdersIndexer(owner.publicKey, client.program.programId);
+        const openOrdersIndexer = findOpenOrdersIndexer(owner.publicKey, programId);
         const [closeIx, signers] = await client.closeOpenOrdersAccountIx(
           owner,
           openOrdersPubkey,
@@ -107,7 +109,7 @@ const closeOOA: CommandModule<{}, CloseOOAArgs> = {
         logger.info(`Found ${openOrdersAccounts.length} OpenOrders accounts. Closing them...`);
         for (const openOrdersPubkey of openOrdersAccounts) {
           try {
-            const openOrdersIndexer = findOpenOrdersIndexer(owner.publicKey, client.program.programId);
+            const openOrdersIndexer = findOpenOrdersIndexer(owner.publicKey, programId);
             logger.info(`Closing OpenOrders account: ${openOrdersPubkey.toBase58()}`);
 
             const [closeIx, signers] = await client.closeOpenOrdersAccountIx(
@@ -121,19 +123,22 @@ const closeOOA: CommandModule<{}, CloseOOAArgs> = {
             const signature = await sendWithRetry(provider, connection, [closeIx], priorityFee);
             logger.info(`Closed OpenOrders account: ${openOrdersPubkey.toBase58()} (TX: ${signature})`);
           } catch (error) {
-            logger.error(`Failed to close OpenOrders account ${openOrdersPubkey.toBase58()}:`, error);
+            handleOpenBookError(error);
           }
         }
       } else if (argv.closeIndexer) {
         // Close the OpenOrders indexer
         logger.info(`Closing OpenOrders indexer for owner: ${owner.publicKey.toBase58()}`);
 
-        const [closeIndexerIx, signers] = await closeOpenOrdersIndexerIx(owner, connection, client.program.programId);
+        try {
+          const [closeIndexerIx, signers] = await closeOpenOrdersIndexerIx(owner, connection, programId);
+          const priorityFee = await getDynamicPriorityFee(connection);
+          const signature = await sendWithRetry(provider, connection, [closeIndexerIx], priorityFee);
 
-        const priorityFee = await getDynamicPriorityFee(connection);
-        const signature = await sendWithRetry(provider, connection, [closeIndexerIx], priorityFee);
-
-        logger.info(`Closed OpenOrders indexer (TX: ${signature})`);
+          logger.info(`Closed OpenOrders indexer (TX: ${signature})`);
+        } catch (error) {
+          handleOpenBookError(error);
+        }
       } else {
         logger.error('Invalid command: Provide either --openOrders, --market, or --closeIndexer');
         process.exit(1);
@@ -141,8 +146,7 @@ const closeOOA: CommandModule<{}, CloseOOAArgs> = {
 
       logger.info('Operation completed successfully.');
     } catch (error) {
-      logger.error('Error occurred while closing OpenOrders accounts:', error);
-      process.exit(1);
+      handleOpenBookError(error);
     }
   },
 };
@@ -182,4 +186,22 @@ async function closeOpenOrdersIndexerIx(
   });
 
   return [ix, [owner]];
+}
+
+/**
+ * Handles OpenBook errors and provides a human-readable response.
+ */
+function handleOpenBookError(error: any) {
+  if (error && error.err && error.err.InstructionError) {
+    const [_, errData] = error.err.InstructionError;
+    if (errData.Custom !== undefined) {
+      const errorMessage = getOpenBookErrorMessage(errData.Custom);
+      logger.error(`OpenBook Error: ${errorMessage}`);
+    } else {
+      logger.error(`Transaction failed with unknown error: ${JSON.stringify(error)}`);
+    }
+  } else {
+    logger.error('Unexpected error occurred:', error);
+  }
+  process.exit(1);
 }
