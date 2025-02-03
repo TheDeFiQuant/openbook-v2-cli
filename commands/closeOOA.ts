@@ -25,7 +25,7 @@ import {
   createProvider,
   loadKeypair,
   loadPublicKey,
-  sendWithRetry, // ← Ensure that sendWithRetry throws the raw error object.
+  sendWithRetry, // NOTE: Ensure that sendWithRetry is updated to throw the raw error object.
   getDynamicPriorityFee,
 } from '../utils/helper';
 import { Connection, PublicKey, TransactionInstruction, Keypair } from '@solana/web3.js';
@@ -97,6 +97,7 @@ const closeOOA: CommandModule<{}, CloseOOAArgs> = {
         );
 
         const priorityFee = await getDynamicPriorityFee(connection);
+        // sendWithRetry is now assumed to throw the raw error object (without wrapping it)
         const signature = await sendWithRetry(provider, connection, [closeIx], priorityFee);
         logger.info(
           `Closed OpenOrders account: ${openOrdersPubkey.toBase58()} (TX: ${signature})`

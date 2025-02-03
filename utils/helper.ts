@@ -1,12 +1,24 @@
-import { Connection, Keypair, PublicKey, TransactionInstruction, Transaction, SystemProgram } from '@solana/web3.js';
+import {
+  Connection,
+  Keypair,
+  PublicKey,
+  TransactionInstruction,
+  Transaction,
+  SystemProgram,
+} from '@solana/web3.js';
 import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
 import fs from 'fs';
 import { Buffer } from 'buffer';
 import { OpenBookV2Client } from '@openbook-dex/openbook-v2';
 import { RPC_CONFIG, PROGRAM_IDS } from './config';
 import logger from './logger';
-import { sendTransaction } from '@openbook-dex/openbook-v2/dist/cjs/utils/rpc';
-import { TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID, getAssociatedTokenAddress, createAssociatedTokenAccountIdempotentInstruction } from '@solana/spl-token';
+import { sendTransaction } from './rpc';
+import {
+  TOKEN_PROGRAM_ID,
+  ASSOCIATED_TOKEN_PROGRAM_ID,
+  getAssociatedTokenAddress,
+  createAssociatedTokenAccountIdempotentInstruction,
+} from '@solana/spl-token';
 
 // Constants
 const BASE_PRIORITY_FEE = BigInt(100_000); // Minimum priority fee
@@ -76,8 +88,8 @@ export async function getDynamicPriorityFee(connection: Connection): Promise<big
 
     // Extract and filter out zero fees
     const nonZeroFees: bigint[] = recentFees
-      .map(f => BigInt(f.prioritizationFee))
-      .filter(fee => fee > 0n);
+      .map((f) => BigInt(f.prioritizationFee))
+      .filter((fee) => fee > 0n);
 
     if (nonZeroFees.length === 0) {
       logger.warn('All recent prioritization fees are 0. Using base priority fee.');
@@ -115,14 +127,23 @@ export async function sendWithRetry(
 
   // Predefined escalation steps for retry attempts
   const baseRetrySteps = [
-    250_000n, 500_000n, 1_000_000n, 1_500_000n,
-    2_000_000n, 4_000_000n, 8_000_000n, 16_000_000n, 32_000_000n
+    250_000n,
+    500_000n,
+    1_000_000n,
+    1_500_000n,
+    2_000_000n,
+    4_000_000n,
+    8_000_000n,
+    16_000_000n,
+    32_000_000n,
   ];
 
   while (attempt < MAX_RETRIES) {
     try {
-      let latestBlockhash = await connection.getLatestBlockhash('confirmed');
-      logger.info(`Attempt ${attempt + 1}/${MAX_RETRIES}: Sending transaction with priority fee ${prioritizationFee.toString()} microLamports`);
+      const latestBlockhash = await connection.getLatestBlockhash('confirmed');
+      logger.info(
+        `Attempt ${attempt + 1}/${MAX_RETRIES}: Sending transaction with priority fee ${prioritizationFee.toString()} microLamports`
+      );
 
       // Send the transaction and store the signature
       signature = await sendTransaction(provider, instructions, [], {
@@ -142,9 +163,10 @@ export async function sendWithRetry(
 
       // If transaction is still pending, allow additional time before retrying
       logger.warn(`Transaction ${signature} is still pending. Retrying after grace period...`);
-      await new Promise(resolve => setTimeout(resolve, 5000)); // Short grace period
+      await new Promise((resolve) => setTimeout(resolve, 5000)); // Short grace period
 
     } catch (error: unknown) {
+      // If error is a known "block height exceeded" error, we retry after increasing the fee.
       if (error instanceof Error && error.message.includes('block height exceeded')) {
         attempt++;
 
@@ -164,9 +186,12 @@ export async function sendWithRetry(
           prioritizationFee *= 2n;
         }
 
-        logger.warn(`Transaction expired. Retrying with increased fee: ${prioritizationFee.toString()} microLamports...`);
+        logger.warn(
+          `Transaction expired. Retrying with increased fee: ${prioritizationFee.toString()} microLamports...`
+        );
       } else {
-        throw new Error(`Transaction failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        // Throw the raw error (do not wrap it) so that its nested properties remain intact.
+        throw error;
       }
     }
   }
@@ -178,12 +203,17 @@ export async function sendWithRetry(
  * Confirms a transaction using getSignatureStatus() with polling.
  * This function provides a more reliable confirmation strategy compared to confirmTransaction().
  */
-export async function confirmTransactionWithPolling(connection: Connection, signature: string): Promise<boolean> {
+export async function confirmTransactionWithPolling(
+  connection: Connection,
+  signature: string
+): Promise<boolean> {
   const maxChecks = 10; // Number of times to check before giving up
   const delay = 1500; // Delay between each check in milliseconds
 
   for (let i = 0; i < maxChecks; i++) {
-    const status = await connection.getSignatureStatus(signature, { searchTransactionHistory: true });
+    const status = await connection.getSignatureStatus(signature, {
+      searchTransactionHistory: true,
+    });
 
     if (status && status.value) {
       const confirmationStatus = status.value.confirmationStatus;
@@ -192,7 +222,7 @@ export async function confirmTransactionWithPolling(connection: Connection, sign
       }
     }
 
-    await new Promise(resolve => setTimeout(resolve, delay)); // Wait before checking again
+    await new Promise((resolve) => setTimeout(resolve, delay)); // Wait before checking again
   }
 
   return false; // Transaction not confirmed within maxChecks
@@ -207,7 +237,7 @@ export async function confirmTransactionWithPolling(connection: Connection, sign
  */
 export async function validateAndFetchMarket(
   connection: Connection,
-  client: OpenBookV2Client, 
+  client: OpenBookV2Client,
   marketPubkey: PublicKey
 ): Promise<any> {
   const marketDataRaw = await connection.getAccountInfo(marketPubkey);
@@ -222,16 +252,16 @@ export async function validateAndFetchMarket(
  * Ensures an Associated Token Account (ATA) exists for a given mint and wallet.
  * If the ATA does not exist, it creates one.
  * @param connection Solana connection object.
- * @param owner Owner keypair.
+ * @param payer Payer keypair (used for funding and signing the transaction).
  * @param mint Token mint public key.
- * @param walletPublicKey Wallet public key to associate the token account with.
+ * @param owner Wallet public key to associate the token account with.
  * @returns Public key of the associated token account.
  */
 export async function ensureAssociatedTokenAccount(
   connection: Connection,
-  payer: Keypair, // Payer funds and signs the transaction
+  payer: Keypair,
   mint: PublicKey,
-  owner: PublicKey // Owner is just a PublicKey
+  owner: PublicKey
 ): Promise<PublicKey> {
   const ata = await getAssociatedTokenAddress(mint, owner, true);
   const ataInfo = await connection.getAccountInfo(ata);
@@ -249,7 +279,7 @@ export async function ensureAssociatedTokenAccount(
       ASSOCIATED_TOKEN_PROGRAM_ID
     );
 
-    // Send the transaction with the payer signing
+    // Send the transaction and wait for confirmation
     const transaction = new Transaction().add(createAtaIx);
     const signature = await connection.sendTransaction(transaction, [payer], { skipPreflight: false });
 
@@ -260,6 +290,3 @@ export async function ensureAssociatedTokenAccount(
 
   return ata;
 }
-
-
-
