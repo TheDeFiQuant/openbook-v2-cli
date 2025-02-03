@@ -154,6 +154,29 @@ const closeOOA: CommandModule<{}, CloseOOAArgs> = {
 export default closeOOA;
 
 /**
+ * Parses OpenBook errors and displays human-readable messages.
+ */
+function handleOpenBookError(error: any) {
+  try {
+    if (error?.err?.InstructionError) {
+      const [_, errorData] = error.err.InstructionError;
+      if (errorData?.Custom !== undefined) {
+        const errorCode = errorData.Custom;
+        const errorMessage = getOpenBookErrorMessage(errorCode);
+        logger.error(`OpenBook Error (${errorCode}): ${errorMessage}`);
+      } else {
+        logger.error(`Unknown transaction error: ${JSON.stringify(error)}`);
+      }
+    } else {
+      logger.error('Unexpected error:', error);
+    }
+  } catch (e) {
+    logger.error('Error parsing OpenBook error:', e);
+  }
+  process.exit(1);
+}
+
+/**
  * Finds the OpenOrdersIndexer PDA for an owner.
  */
 function findOpenOrdersIndexer(owner: PublicKey, programId: PublicKey): PublicKey {
@@ -186,22 +209,4 @@ async function closeOpenOrdersIndexerIx(
   });
 
   return [ix, [owner]];
-}
-
-/**
- * Handles OpenBook errors and provides a human-readable response.
- */
-function handleOpenBookError(error: any) {
-  if (error && error.err && error.err.InstructionError) {
-    const [_, errData] = error.err.InstructionError;
-    if (errData.Custom !== undefined) {
-      const errorMessage = getOpenBookErrorMessage(errData.Custom);
-      logger.error(`OpenBook Error: ${errorMessage}`);
-    } else {
-      logger.error(`Transaction failed with unknown error: ${JSON.stringify(error)}`);
-    }
-  } else {
-    logger.error('Unexpected error occurred:', error);
-  }
-  process.exit(1);
 }
