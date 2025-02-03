@@ -29,8 +29,8 @@ import {
   getDynamicPriorityFee,
 } from '../utils/helper';
 import { Connection, PublicKey, TransactionInstruction, Keypair } from '@solana/web3.js';
+import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
-import { OpenBookV2Client } from '@openbook-dex/openbook-v2';
 import logger from '../utils/logger';
 
 /**
@@ -82,7 +82,7 @@ const closeOOA: CommandModule<{}, CloseOOAArgs> = {
         const openOrdersPubkey = loadPublicKey(argv.openOrders);
         logger.info(`Closing OpenOrders account: ${openOrdersPubkey.toBase58()}`);
 
-        const openOrdersIndexer = client.findOpenOrdersIndexer(owner.publicKey);
+        const openOrdersIndexer = findOpenOrdersIndexer(owner.publicKey, client.program.programId);
         const [closeIx, signers] = await client.closeOpenOrdersAccountIx(
           owner,
           openOrdersPubkey,
@@ -107,7 +107,7 @@ const closeOOA: CommandModule<{}, CloseOOAArgs> = {
         logger.info(`Found ${openOrdersAccounts.length} OpenOrders accounts. Closing them...`);
         for (const openOrdersPubkey of openOrdersAccounts) {
           try {
-            const openOrdersIndexer = client.findOpenOrdersIndexer(owner.publicKey);
+            const openOrdersIndexer = findOpenOrdersIndexer(owner.publicKey, client.program.programId);
             logger.info(`Closing OpenOrders account: ${openOrdersPubkey.toBase58()}`);
 
             const [closeIx, signers] = await client.closeOpenOrdersAccountIx(
@@ -128,11 +128,7 @@ const closeOOA: CommandModule<{}, CloseOOAArgs> = {
         // Close the OpenOrders indexer
         logger.info(`Closing OpenOrders indexer for owner: ${owner.publicKey.toBase58()}`);
 
-        const openOrdersIndexer = client.findOpenOrdersIndexer(owner.publicKey);
-        const [closeIndexerIx, signers] = await client.closeOpenOrdersIndexerIx(
-          owner,
-          openOrdersIndexer
-        );
+        const [closeIndexerIx, signers] = await closeOpenOrdersIndexerIx(owner, connection, client.program.programId);
 
         const priorityFee = await getDynamicPriorityFee(connection);
         const signature = await sendWithRetry(provider, connection, [closeIndexerIx], priorityFee);
@@ -152,3 +148,38 @@ const closeOOA: CommandModule<{}, CloseOOAArgs> = {
 };
 
 export default closeOOA;
+
+/**
+ * Finds the OpenOrdersIndexer PDA for an owner.
+ */
+function findOpenOrdersIndexer(owner: PublicKey, programId: PublicKey): PublicKey {
+  const [openOrdersIndexer] = PublicKey.findProgramAddressSync(
+    [Buffer.from('OpenOrdersIndexer'), owner.toBuffer()],
+    programId
+  );
+  return openOrdersIndexer;
+}
+
+/**
+ * Constructs the transaction instruction to close the OpenOrders Indexer.
+ */
+async function closeOpenOrdersIndexerIx(
+  owner: Keypair,
+  connection: Connection,
+  programId: PublicKey
+): Promise<[TransactionInstruction, Keypair[]]> {
+  const openOrdersIndexer = findOpenOrdersIndexer(owner.publicKey, programId);
+
+  const ix = new TransactionInstruction({
+    keys: [
+      { pubkey: owner.publicKey, isSigner: true, isWritable: false },
+      { pubkey: openOrdersIndexer, isSigner: false, isWritable: true },
+      { pubkey: owner.publicKey, isSigner: false, isWritable: true },
+      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+    ],
+    programId,
+    data: Buffer.alloc(0),
+  });
+
+  return [ix, [owner]];
+}
