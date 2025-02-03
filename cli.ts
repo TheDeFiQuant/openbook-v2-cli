@@ -160,6 +160,7 @@
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 
+import getMarkets from './commands/getMarkets';
 import marketData from './commands/marketData';
 import createOOA from './commands/createOOA';
 import getOOA from './commands/getOOA';
@@ -174,6 +175,7 @@ import cancelOrder from './commands/cancelOrder';
 yargs(hideBin(process.argv))
   .scriptName('openbook-cli')
   .usage('$0 <command> [options]')
+  .command(getMarkets)
   .command(marketData)
   .command(createOOA)
   .command(getOOA)
