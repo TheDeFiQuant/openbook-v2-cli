@@ -157,7 +157,6 @@
  * --ownerKeypair (Required): Path to the keypair file of the order owner.
  */
 
-
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 
@@ -189,4 +188,15 @@ yargs(hideBin(process.argv))
   .help()
   .alias('help', 'h')
   .strict()
+  .fail((msg, err, yargs) => {
+    if (err) {
+      // Log only errors, do not display help text
+      console.error(`Error: ${err.message}`);
+      process.exit(1);
+    } else {
+      console.error(msg);
+      console.error(yargs.help());
+      process.exit(1);
+    }
+  })
   .argv;

@@ -79,62 +79,7 @@ const closeOOA: CommandModule<{}, CloseOOAArgs> = {
     const programId = client.program.programId; // Extract program ID
 
     try {
-      if (argv.openOrders) {
-        // Close a specific OpenOrders account
-        const openOrdersPubkey = loadPublicKey(argv.openOrders);
-        logger.info(`Closing OpenOrders account: ${openOrdersPubkey.toBase58()}`);
-
-        const openOrdersIndexer = findOpenOrdersIndexer(owner.publicKey, programId);
-        const [closeIx, signers] = await client.closeOpenOrdersAccountIx(
-          owner,
-          openOrdersPubkey,
-          owner.publicKey,
-          openOrdersIndexer
-        );
-
-        const priorityFee = await getDynamicPriorityFee(connection);
-        const signature = await sendWithRetry(provider, connection, [closeIx], priorityFee);
-        logger.info(`Closed OpenOrders account: ${openOrdersPubkey.toBase58()} (TX: ${signature})`);
-        return;
-      }
-
-      if (argv.market) {
-        // Close all OpenOrders accounts for a specific market
-        const marketPubkey = loadPublicKey(argv.market);
-        logger.info(`Fetching all OpenOrders accounts for market: ${marketPubkey.toBase58()}`);
-
-        const openOrdersAccounts = await client.findOpenOrdersForMarket(owner.publicKey, marketPubkey);
-        if (openOrdersAccounts.length === 0) {
-          logger.info('No OpenOrders accounts found for the specified market.');
-          return;
-        }
-
-        logger.info(`Found ${openOrdersAccounts.length} OpenOrders accounts. Closing them...`);
-        for (const openOrdersPubkey of openOrdersAccounts) {
-          try {
-            const openOrdersIndexer = findOpenOrdersIndexer(owner.publicKey, programId);
-            logger.info(`Closing OpenOrders account: ${openOrdersPubkey.toBase58()}`);
-
-            const [closeIx, signers] = await client.closeOpenOrdersAccountIx(
-              owner,
-              openOrdersPubkey,
-              owner.publicKey,
-              openOrdersIndexer
-            );
-
-            const priorityFee = await getDynamicPriorityFee(connection);
-            const signature = await sendWithRetry(provider, connection, [closeIx], priorityFee);
-            logger.info(`Closed OpenOrders account: ${openOrdersPubkey.toBase58()} (TX: ${signature})`);
-          } catch (error) {
-            logger.error(`Failed to close OpenOrders account ${openOrdersPubkey.toBase58()}:`, error);
-            handleOpenBookError(error);
-          }
-        }
-        return;
-      }
-
       if (argv.closeIndexer) {
-        // Close the OpenOrders indexer
         logger.info(`Closing OpenOrders indexer for owner: ${owner.publicKey.toBase58()}`);
 
         try {
@@ -146,15 +91,23 @@ const closeOOA: CommandModule<{}, CloseOOAArgs> = {
           logger.info(`Closed OpenOrders indexer (TX: ${signature})`);
           return;
         } catch (error) {
-          logger.error(`Failed to close OpenOrders indexer:`, error);
-          handleOpenBookError(error);
+          // Ensure correct error logging and avoid empty `{}` errors
+          logger.error(`Raw error object: ${JSON.stringify(error, null, 2)}`);
+
+          if (!handleOpenBookError(error)) {
+            logger.error("Failed to close OpenOrders indexer:", error);
+          }
 
           throw new Error(`Failed to close OpenOrders indexer: ${error instanceof Error ? error.message : "Unknown error"}`);
         }
       }
     } catch (error) {
-      logger.error('Unexpected error occurred:', error);
-      handleOpenBookError(error);
+      // Ensure correct error logging and avoid empty `{}` errors
+      logger.error(`Raw error object: ${JSON.stringify(error, null, 2)}`);
+
+      if (!handleOpenBookError(error)) {
+        logger.error("Unexpected error occurred:", error);
+      }
 
       throw new Error(`Unexpected error: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
@@ -165,29 +118,31 @@ export default closeOOA;
 
 /**
  * Parses OpenBook errors and displays human-readable messages.
+ * Returns `true` if an OpenBook error was handled, `false` otherwise.
  */
-function handleOpenBookError(error: any) {
+function handleOpenBookError(error: any): boolean {
   try {
-    // Convert error to an object to avoid empty `{}` in JSON.stringify
-    const rawErrorMessage = error instanceof Error ? { message: error.message, stack: error.stack } : error;
-    logger.error(`Raw error response: ${JSON.stringify(rawErrorMessage, null, 2)}`);
+    if (!error || typeof error !== "object") {
+      logger.error(`Invalid error format: ${JSON.stringify(error, null, 2)}`);
+      return false;
+    }
 
     if (error?.err?.InstructionError) {
       const [_, errorData] = error.err.InstructionError;
 
-      logger.error(`Detailed InstructionError: ${JSON.stringify(errorData, null, 2)}`);
-
-      if (typeof errorData === "object" && "Custom" in errorData) {
+      if (typeof errorData === "object" && errorData !== null && "Custom" in errorData) {
         const errorCode = errorData.Custom;
         const errorMessage = getOpenBookErrorMessage(errorCode);
+
         logger.error(`OpenBook Error (${errorCode}): ${errorMessage}`);
-        return;
+        return true; // The error was identified and logged
       }
     }
 
-    logger.error(`Unexpected error format: ${JSON.stringify(rawErrorMessage, null, 2)}`);
+    return false; // Not an OpenBook error, allow generic logging
   } catch (e) {
-    logger.error('Error processing OpenBook error:', e);
+    logger.error("Error processing OpenBook error:", e);
+    return false;
   }
 }
 
