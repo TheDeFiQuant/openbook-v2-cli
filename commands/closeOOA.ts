@@ -28,7 +28,7 @@ import {
   sendWithRetry,
   getDynamicPriorityFee,
 } from '../utils/helper';
-import { Connection, PublicKey, TransactionInstruction, Keypair } from '@solana/web3.js';
+import { Connection, PublicKey, TransactionInstruction, Keypair, SystemProgram } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
 import { getOpenBookErrorMessage } from '../utils/error';
@@ -95,7 +95,10 @@ const closeOOA: CommandModule<{}, CloseOOAArgs> = {
         const priorityFee = await getDynamicPriorityFee(connection);
         const signature = await sendWithRetry(provider, connection, [closeIx], priorityFee);
         logger.info(`Closed OpenOrders account: ${openOrdersPubkey.toBase58()} (TX: ${signature})`);
-      } else if (argv.market) {
+        return;
+      }
+
+      if (argv.market) {
         // Close all OpenOrders accounts for a specific market
         const marketPubkey = loadPublicKey(argv.market);
         logger.info(`Fetching all OpenOrders accounts for market: ${marketPubkey.toBase58()}`);
@@ -123,30 +126,37 @@ const closeOOA: CommandModule<{}, CloseOOAArgs> = {
             const signature = await sendWithRetry(provider, connection, [closeIx], priorityFee);
             logger.info(`Closed OpenOrders account: ${openOrdersPubkey.toBase58()} (TX: ${signature})`);
           } catch (error) {
+            logger.error(`Failed to close OpenOrders account ${openOrdersPubkey.toBase58()}:`, error);
             handleOpenBookError(error);
           }
         }
-      } else if (argv.closeIndexer) {
+        return;
+      }
+
+      if (argv.closeIndexer) {
         // Close the OpenOrders indexer
         logger.info(`Closing OpenOrders indexer for owner: ${owner.publicKey.toBase58()}`);
 
         try {
-          const [closeIndexerIx, signers] = await closeOpenOrdersIndexerIx(owner, connection, programId);
+          const openOrdersIndexer = findOpenOrdersIndexer(owner.publicKey, programId);
+          const [closeIndexerIx, signers] = await closeOpenOrdersIndexerIx(owner, connection, programId, openOrdersIndexer);
           const priorityFee = await getDynamicPriorityFee(connection);
           const signature = await sendWithRetry(provider, connection, [closeIndexerIx], priorityFee);
 
           logger.info(`Closed OpenOrders indexer (TX: ${signature})`);
+          return;
         } catch (error) {
+          logger.error(`Failed to close OpenOrders indexer:`, error);
           handleOpenBookError(error);
-        }
-      } else {
-        logger.error('Invalid command: Provide either --openOrders, --market, or --closeIndexer');
-        process.exit(1);
-      }
 
-      logger.info('Operation completed successfully.');
+          throw new Error(`Failed to close OpenOrders indexer: ${error instanceof Error ? error.message : "Unknown error"}`);
+        }
+      }
     } catch (error) {
+      logger.error('Unexpected error occurred:', error);
       handleOpenBookError(error);
+
+      throw new Error(`Unexpected error: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
   },
 };
@@ -158,33 +168,37 @@ export default closeOOA;
  */
 function handleOpenBookError(error: any) {
   try {
+    // Convert error to an object to avoid empty `{}` in JSON.stringify
+    const rawErrorMessage = error instanceof Error ? { message: error.message, stack: error.stack } : error;
+    logger.error(`Raw error response: ${JSON.stringify(rawErrorMessage, null, 2)}`);
+
     if (error?.err?.InstructionError) {
       const [_, errorData] = error.err.InstructionError;
-      if (errorData?.Custom !== undefined) {
+
+      logger.error(`Detailed InstructionError: ${JSON.stringify(errorData, null, 2)}`);
+
+      if (typeof errorData === "object" && "Custom" in errorData) {
         const errorCode = errorData.Custom;
         const errorMessage = getOpenBookErrorMessage(errorCode);
         logger.error(`OpenBook Error (${errorCode}): ${errorMessage}`);
-      } else {
-        logger.error(`Unknown transaction error: ${JSON.stringify(error)}`);
+        return;
       }
-    } else {
-      logger.error('Unexpected error:', error);
     }
+
+    logger.error(`Unexpected error format: ${JSON.stringify(rawErrorMessage, null, 2)}`);
   } catch (e) {
-    logger.error('Error parsing OpenBook error:', e);
+    logger.error('Error processing OpenBook error:', e);
   }
-  process.exit(1);
 }
 
 /**
  * Finds the OpenOrdersIndexer PDA for an owner.
  */
 function findOpenOrdersIndexer(owner: PublicKey, programId: PublicKey): PublicKey {
-  const [openOrdersIndexer] = PublicKey.findProgramAddressSync(
+  return PublicKey.findProgramAddressSync(
     [Buffer.from('OpenOrdersIndexer'), owner.toBuffer()],
     programId
-  );
-  return openOrdersIndexer;
+  )[0];
 }
 
 /**
@@ -193,10 +207,9 @@ function findOpenOrdersIndexer(owner: PublicKey, programId: PublicKey): PublicKe
 async function closeOpenOrdersIndexerIx(
   owner: Keypair,
   connection: Connection,
-  programId: PublicKey
+  programId: PublicKey,
+  openOrdersIndexer: PublicKey
 ): Promise<[TransactionInstruction, Keypair[]]> {
-  const openOrdersIndexer = findOpenOrdersIndexer(owner.publicKey, programId);
-
   const ix = new TransactionInstruction({
     keys: [
       { pubkey: owner.publicKey, isSigner: true, isWritable: false },
