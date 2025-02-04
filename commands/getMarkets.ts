@@ -2,7 +2,7 @@
  * CLI Command: getMarkets
  * 
  * Description:
- * - Retrieves all markets listed on OpenBook.
+ * - Retrieves all markets listed on OpenBook along with vault balances.
  *
  * Example Usage:
  * npx ts-node cli.ts getMarkets
@@ -21,7 +21,7 @@ import { PROGRAM_IDS } from '../utils/config';
  */
 const getMarkets: CommandModule<{}, {}> = {
   command: 'getMarkets',
-  describe: 'Retrieve all markets listed on OpenBook',
+  describe: 'Retrieve all markets listed on OpenBook along with vault balances',
   builder: (yargs) => yargs,
   handler: async () => {
     // Establish a connection to the Solana blockchain
@@ -36,7 +36,7 @@ const getMarkets: CommandModule<{}, {}> = {
     try {
       logger.info('Fetching all markets on OpenBook...');
 
-      // Retrieve all markets
+      // Retrieve all markets, including vault balances
       const markets = await findAllMarkets(connection, PROGRAM_IDS.OPENBOOK_V2_PROGRAM_ID, provider);
 
       if (markets.length === 0) {
@@ -44,13 +44,43 @@ const getMarkets: CommandModule<{}, {}> = {
         return;
       }
 
-      // Log and display market data
-      logger.info(`Found ${markets.length} markets on OpenBook:`);
+      // **Column Formatting Setup**
+      const colWidths = {
+        market: 45,
+        name: 20,
+        baseMint: 45,
+        quoteMint: 45,
+        baseVaultBalance: 15,
+        quoteVaultBalance: 15
+      };
+
+      const header = 
+        `${'Market'.padEnd(colWidths.market)} | ` +
+        `${'Name'.padEnd(colWidths.name)} | ` +
+        `${'Base Mint'.padEnd(colWidths.baseMint)} | ` +
+        `${'Quote Mint'.padEnd(colWidths.quoteMint)} | ` +
+        `${'Base Vault Balance'.padEnd(colWidths.baseVaultBalance)} | ` +
+        `${'Quote Vault Balance'.padEnd(colWidths.quoteVaultBalance)}`;
+
+      const separator = '-'.repeat(header.length);
+
+      console.log('\n' + header);
+      console.log(separator);
+
+      // **Formatted Table Output**
       for (const market of markets) {
-        logger.info(
-          `Market: ${market.market}\n  Base Mint: ${market.baseMint}\n  Quote Mint: ${market.quoteMint}\n  Name: ${market.name}\n  Timestamp: ${new Date(market.timestamp! * 1000).toLocaleString()}`
+        console.log(
+          `${market.market.padEnd(colWidths.market)} | ` +
+          `${market.name.padEnd(colWidths.name)} | ` +
+          `${market.baseMint.padEnd(colWidths.baseMint)} | ` +
+          `${market.quoteMint.padEnd(colWidths.quoteMint)} | ` +
+          `${(market.baseVaultBalance !== 'Unavailable' ? market.baseVaultBalance.toFixed(6) : 'Unavailable').padEnd(colWidths.baseVaultBalance)} | ` +
+          `${(market.quoteVaultBalance !== 'Unavailable' ? market.quoteVaultBalance.toFixed(6) : 'Unavailable').padEnd(colWidths.quoteVaultBalance)}`
         );
       }
+
+      console.log(separator);
+
     } catch (error) {
       logger.error(`Error occurred while fetching markets: ${(error as Error).message}`);
     }
