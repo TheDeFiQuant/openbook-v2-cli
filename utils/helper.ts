@@ -29,19 +29,6 @@ export function createConnection(url: string = RPC_CONFIG.MAINNET_URL): Connecti
   return new Connection(url, 'confirmed');
 }
 
-// Load Signer Keypair from a File
-export function loadKeypair(filePath: string): Keypair {
-  try {
-    const keyData = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-    return Keypair.fromSecretKey(Buffer.from(keyData));
-  } catch (error) {
-    if (error instanceof Error) {
-      throw new Error(`Failed to load keypair from file: ${filePath}. Error: ${error.message}`);
-    }
-    throw new Error(`Failed to load keypair from file: ${filePath}.`);
-  }
-}
-
 // Create a Read-Only Wallet
 export function createStubWallet(): Wallet {
   const stubKeypair = Keypair.generate();
@@ -58,6 +45,19 @@ export function createProvider(connection: Connection, wallet: Wallet): AnchorPr
 // Initialize OpenBookV2 Client
 export function createClient(provider: AnchorProvider): OpenBookV2Client {
   return new OpenBookV2Client(provider, PROGRAM_IDS.OPENBOOK_V2_PROGRAM_ID);
+}
+
+// Load Signer Keypair from a File
+export function loadKeypair(filePath: string): Keypair {
+  try {
+    const keyData = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+    return Keypair.fromSecretKey(Buffer.from(keyData));
+  } catch (error) {
+    if (error instanceof Error) {
+      throw new Error(`Failed to load keypair from file: ${filePath}. Error: ${error.message}`);
+    }
+    throw new Error(`Failed to load keypair from file: ${filePath}.`);
+  }
 }
 
 // Load Public Key
