@@ -72,14 +72,12 @@ npx ts-node cli.ts getOOA <OWNER_PUBLIC_KEY> [--market <MARKET_PUBLIC_KEY>]
 
 ### Close OpenOrders Account (OOA)
 
-The `closeOOA` command allows you to close an OpenOrders account, all OpenOrders accounts for a market, or the OpenOrders indexer (after all OpenOrders are closed).
-
-#### Example Usage:
+The `closeOOA` command allows you to close an OpenOrders account, all OpenOrders accounts for a market, or the OpenOrders indexer (after all OpenOrdersAccounts are closed).
 
 ```sh
 npx ts-node cli.ts closeOOA --ownerKeypair <KEYPAIR_PATH> --openOrders <OPEN_ORDERS_PUBKEY>
 npx ts-node cli.ts closeOOA --ownerKeypair <KEYPAIR_PATH> --market <MARKET_PUBKEY>
-npx ts-node cli.ts closeOOA --ownerKeypair <KEYPAIR_PATH> --closeIndexer
+npx ts-node cli.ts closeOOA --ownerKeypair <KEYPAIR_PATH> --closeIndexer (does not work right now)
 ```
 
 | Parameter        | Description                                                       | Required |
@@ -87,7 +85,7 @@ npx ts-node cli.ts closeOOA --ownerKeypair <KEYPAIR_PATH> --closeIndexer
 | `--ownerKeypair` | Path to the keypair file of the OpenOrders account owner        | Yes      |
 | `--openOrders`   | Public key of a specific OpenOrders account to close           | No       |
 | `--market`       | Public key of the market (required if closing all OpenOrders)  | No       |
-| `--closeIndexer` | Closes the OpenOrders indexer (only after all OpenOrders are closed) | No       |
+| `--closeIndexer` | Closes the OpenOrders indexer (does not work right now) | No       |
 
 ### Deposit Funds
 

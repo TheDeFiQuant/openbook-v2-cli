@@ -9,13 +9,13 @@
  * Example Usage:
  * npx ts-node cli.ts closeOOA --ownerKeypair <KEYPAIR_PATH> --openOrders <OPEN_ORDERS_PUBKEY>
  * npx ts-node cli.ts closeOOA --ownerKeypair <KEYPAIR_PATH> --market <MARKET_PUBKEY>
- * npx ts-node cli.ts closeOOA --ownerKeypair <KEYPAIR_PATH> --closeIndexer
+ * npx ts-node cli.ts closeOOA --ownerKeypair <KEYPAIR_PATH> --closeIndexer (does not work right now)
  *
  * Parameters:
  * --ownerKeypair (Required): Path to the keypair file of the OpenOrders account owner.
  * --market (Optional): Public key of the market (required if closing all OpenOrders accounts for a market).
  * --openOrders (Optional): Public key of a specific OpenOrders account to close.
- * --closeIndexer (Optional): If set, closes the OpenOrders indexer.
+ * --closeIndexer (Optional): If set, closes the OpenOrders indexer. (does not work right now)
  */
 
 import { CommandModule } from 'yargs';
@@ -70,7 +70,7 @@ const closeOOA: CommandModule<{}, CloseOOAArgs> = {
       .option('closeIndexer', {
         type: 'boolean',
         description:
-          'Close the OpenOrders indexer (only one per owner, shared across all markets)',
+          'Close the OpenOrders indexer (only one per owner, shared across all markets) DOES NOT WORK RIGHT NOW',
       }),
   handler: async (argv) => {
     // Initialize the Solana connection and load the owner's keypair.
@@ -158,7 +158,7 @@ const closeOOA: CommandModule<{}, CloseOOAArgs> = {
           logger.info(`Closed OpenOrders indexer (TX: ${signature})`);
           return;
         } catch (error) {
-          logger.error(`Failed to close OpenOrders indexer.`);
+          logger.error(`Failed to close OpenOrders indexer. Currently there is a Bug in Openbooks code that prevents the OOAindexer to be closed.`);
           handleOpenBookError(error);
           // On a critical failure in closing the indexer, log a friendly message and exit.
           process.exit(1);
