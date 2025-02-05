@@ -32,12 +32,13 @@
     "@metaplex-foundation/umi-bundle-defaults": "^1.0.0",
     "@openbook-dex/openbook-v2": "^0.2.10",
     "@solana/web3.js": "^1.77.3",
-    "big.js": "^6.2.1",
+    "big.js": "^6.2.2",
     "dotenv": "^16.4.7",
     "winston": "^3.8.2",
     "yargs": "^17.7.2"
   },
   "devDependencies": {
+    "@types/big.js": "^6.2.2",
     "@types/dotenv": "^8.2.3",
     "@types/node": "^22.10.7",
     "@types/yargs": "^17.0.33",

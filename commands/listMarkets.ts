@@ -2,8 +2,16 @@
  * CLI Command: listMarkets
  *
  * Description:
- *   Lists all markets on the exchange along with their base and quote vault balances (UI amounts)
- *   and token symbols for the base and quote mints.
+ *   Loads all market accounts from the exchange and displays the following
+ *   for each market:
+ *     - Market name
+ *     - Market public key
+ *     - Base token symbol
+ *     - Quote token symbol
+ *     - Base vault balance in UI units (converted using the base mint’s decimals)
+ *     - Quote vault balance in UI units (converted using the quote mint’s decimals)
+ *
+ * The conversion from native units to UI amounts is done using the mint account's decimals.
  *
  * Example Usage:
  *   npx ts-node cli.ts listMarkets
@@ -13,75 +21,100 @@ import { CommandModule } from 'yargs';
 import { Connection, PublicKey } from '@solana/web3.js';
 import { createConnection, createProvider, createClient, createStubWallet } from '../utils/helper';
 import logger from '../utils/logger';
-import { nameToString, baseLotsToUi, quoteLotsToUi } from '@openbook-dex/openbook-v2';
+import { 
+  nameToString, 
+  quoteLotsToUi,
+  type MarketAccount,
+} from '@openbook-dex/openbook-v2';
 import { BN } from '@coral-xyz/anchor';
-import { createUmi } from '@metaplex-foundation/umi-bundle-defaults'
+import { createUmi } from '@metaplex-foundation/umi-bundle-defaults';
 import { mplTokenMetadata, fetchMetadata, findMetadataPda } from '@metaplex-foundation/mpl-token-metadata';
 import { publicKey } from '@metaplex-foundation/umi-public-keys';
 import { RPC_CONFIG } from '../utils/config';
+import Big from 'big.js';
+import { getMint } from '@solana/spl-token';
 
+/**
+ * Helper: Convert a native amount into a UI amount using the mint's decimals.
+ * For example, if nativeAmount = 25880000 and decimals = 5, then UI amount = 25880000 / 10^5 = 258.8.
+ */
+function toUiDecimals(nativeAmount: number, decimals: number): number {
+  return nativeAmount / Math.pow(10, decimals);
+}
+
+/**
+ * Retrieves the token symbol from the mint's metadata.
+ */
 async function getTokenSymbol(connection: Connection, mint: PublicKey): Promise<string> {
   try {
-    // Initialize Umi using the same RPC as Solana
     const umi = createUmi(RPC_CONFIG.MAINNET_URL);
     umi.use(mplTokenMetadata());
-
-    // Convert Solana PublicKey to Umi PublicKey
     const metadataPda = findMetadataPda(umi, { mint: publicKey(mint) });
     const metadata = await fetchMetadata(umi, metadataPda);
-
     return metadata.symbol;
-  } catch (error) {
-    logger.warn(`Unable to fetch token symbol for mint ${mint.toBase58()}: ${(error as Error).message}`);
+  } catch {
     return 'N/A';
   }
 }
 
 interface ListMarketsArgs {}
 
+/**
+ * Main command handler.
+ */
 const listMarkets: CommandModule<{}, ListMarketsArgs> = {
   command: 'listMarkets',
   describe:
-    'List all markets with their base and quote vault balances (UI amounts) and token symbols for the base and quote mints',
+    'Load all market accounts and display their market name, pubkey, token symbols, and vault balances (UI amounts)',
   builder: (yargs) =>
     yargs.example('npx ts-node cli.ts listMarkets', 'Lists all markets using the default RPC endpoint'),
   handler: async () => {
     try {
-      // Establish a connection using the default RPC endpoint.
+      logger.info('Connecting to RPC endpoint...');
       const connection: Connection = createConnection();
 
-      // Create a read-only wallet and an Anchor provider.
+      logger.info('Creating provider and stub wallet...');
       const wallet = createStubWallet();
       const provider = createProvider(connection, wallet);
 
-      // Initialize the OpenBook client.
+      logger.info('Initializing OpenBook client...');
       const client = createClient(provider);
 
-      logger.info('Fetching all market accounts...');
-
+      logger.info('Loading market accounts...');
       const marketAccounts = await client.program.account.market.all();
+      logger.info(`Loaded ${marketAccounts.length} market account(s).`);
 
       if (marketAccounts.length === 0) {
         logger.info('No markets found.');
         return;
       }
 
+      // Array to store processed market data.
       const marketsData: {
         marketName: string;
         marketPubkey: string;
-        baseVault: string;
-        quoteVault: string;
         baseSymbol: string;
         quoteSymbol: string;
-        quoteBalance: number;
         baseBalance: number;
+        quoteBalance: number;
       }[] = [];
 
+      let processedCount = 0;
+      // Process each market account.
       for (const marketAccount of marketAccounts) {
         try {
+          processedCount++;
+          // Update progress on the same line.
+          process.stdout.write(`Processed ${processedCount} of ${marketAccounts.length} markets...\r`);
+
           const marketPubkey = marketAccount.publicKey;
           const market = marketAccount.account;
 
+          // Fetch mint info for base and quote mints to use their decimals.
+          const baseMintInfo = await getMint(connection, market.baseMint);
+          const quoteMintInfo = await getMint(connection, market.quoteMint);
+
+          // Retrieve vault balances (in native units).
           const baseVaultInfo = await connection
             .getTokenAccountBalance(market.marketBaseVault)
             .catch(() => null);
@@ -89,26 +122,26 @@ const listMarkets: CommandModule<{}, ListMarketsArgs> = {
             .getTokenAccountBalance(market.marketQuoteVault)
             .catch(() => null);
 
-          const rawBaseBalance = baseVaultInfo ? new BN(baseVaultInfo.value.amount) : new BN(0);
-          const rawQuoteBalance = quoteVaultInfo ? new BN(quoteVaultInfo.value.amount) : new BN(0);
+          const rawBaseBalance = baseVaultInfo ? parseFloat(baseVaultInfo.value.amount) : 0;
+          const rawQuoteBalance = quoteVaultInfo ? parseFloat(quoteVaultInfo.value.amount) : 0;
 
-          const uiBaseBalance = baseLotsToUi(market, rawBaseBalance);
-          const uiQuoteBalance = quoteLotsToUi(market, rawQuoteBalance);
+          // Convert native amounts to UI amounts using mint decimals.
+          const uiBaseBalance = toUiDecimals(rawBaseBalance, baseMintInfo.decimals);
+          const uiQuoteBalance = toUiDecimals(rawQuoteBalance, quoteMintInfo.decimals);
 
           const marketName = market.name ? nameToString(market.name) : 'Unnamed';
 
+          // Get token symbols from their mint accounts.
           const baseSymbol = await getTokenSymbol(connection, market.baseMint);
           const quoteSymbol = await getTokenSymbol(connection, market.quoteMint);
 
           marketsData.push({
             marketName,
             marketPubkey: marketPubkey.toBase58(),
-            baseVault: market.marketBaseVault.toBase58(),
-            quoteVault: market.marketQuoteVault.toBase58(),
             baseSymbol,
             quoteSymbol,
-            quoteBalance: uiQuoteBalance,
             baseBalance: uiBaseBalance,
+            quoteBalance: uiQuoteBalance,
           });
         } catch (err) {
           logger.error(
@@ -117,63 +150,88 @@ const listMarkets: CommandModule<{}, ListMarketsArgs> = {
         }
       }
 
-      const quoteBalanceHeader = 'Quote Balance';
-      const baseBalanceHeader = 'Base Balance';
-      const maxQuoteBalanceLength = Math.max(
-        ...marketsData.map((d) => d.quoteBalance.toString().length),
-        quoteBalanceHeader.length
-      );
-      const maxBaseBalanceLength = Math.max(
-        ...marketsData.map((d) => d.baseBalance.toString().length),
-        baseBalanceHeader.length
-      );
+      // Ensure the progress line finishes with a newline.
+      console.log('');
 
-      const colWidths = {
-        marketName: 20,
-        marketPubkey: 44,
-        baseVault: 44,
-        quoteVault: 44,
-        baseSymbol: 12,
-        quoteSymbol: 12,
-        quoteBalance: maxQuoteBalanceLength,
-        baseBalance: maxBaseBalanceLength,
+      logger.info(`Finished processing ${processedCount} market(s).`);
+      logger.info(`Displaying ${marketsData.length} market(s).`);
+
+      // Define table headers.
+      const headers = {
+        marketName: 'Market Name',
+        marketPubkey: 'Market Pubkey',
+        baseSymbol: 'Base Symbol',
+        quoteSymbol: 'Quote Symbol',
+        baseBalance: 'Base Balance',
+        quoteBalance: 'Quote Balance',
       };
 
-      const header =
-        `${'Market Name'.padEnd(colWidths.marketName)} | ` +
-        `${'Market Pubkey'.padEnd(colWidths.marketPubkey)} | ` +
-        `${'Base Vault'.padEnd(colWidths.baseVault)} | ` +
-        `${'Quote Vault'.padEnd(colWidths.quoteVault)} | ` +
-        `${'Base Symbol'.padEnd(colWidths.baseSymbol)} | ` +
-        `${'Quote Symbol'.padEnd(colWidths.quoteSymbol)} | ` +
-        `${quoteBalanceHeader.padEnd(colWidths.quoteBalance)} | ` +
-        `${baseBalanceHeader.padEnd(colWidths.baseBalance)}`;
+      // Determine column widths based on header and data lengths.
+      const colWidths = {
+        marketName: Math.max(
+          ...marketsData.map((d) => d.marketName.length),
+          headers.marketName.length,
+          20
+        ),
+        marketPubkey: Math.max(
+          ...marketsData.map((d) => d.marketPubkey.length),
+          headers.marketPubkey.length,
+          44
+        ),
+        baseSymbol: Math.max(
+          ...marketsData.map((d) => d.baseSymbol.length),
+          headers.baseSymbol.length,
+          12
+        ),
+        quoteSymbol: Math.max(
+          ...marketsData.map((d) => d.quoteSymbol.length),
+          headers.quoteSymbol.length,
+          12
+        ),
+        baseBalance: Math.max(
+          ...marketsData.map((d) => d.baseBalance.toString().length),
+          headers.baseBalance.length,
+          12
+        ),
+        quoteBalance: Math.max(
+          ...marketsData.map((d) => d.quoteBalance.toString().length),
+          headers.quoteBalance.length,
+          12
+        ),
+      };
+
+      // Build header line.
+      const headerLine =
+        `${headers.marketName.padEnd(colWidths.marketName)} | ` +
+        `${headers.marketPubkey.padEnd(colWidths.marketPubkey)} | ` +
+        `${headers.baseSymbol.padEnd(colWidths.baseSymbol)} | ` +
+        `${headers.quoteSymbol.padEnd(colWidths.quoteSymbol)} | ` +
+        `${headers.baseBalance.padEnd(colWidths.baseBalance)} | ` +
+        `${headers.quoteBalance.padEnd(colWidths.quoteBalance)}`;
 
       const totalWidth =
         colWidths.marketName +
         colWidths.marketPubkey +
-        colWidths.baseVault +
-        colWidths.quoteVault +
         colWidths.baseSymbol +
         colWidths.quoteSymbol +
-        colWidths.quoteBalance +
         colWidths.baseBalance +
-        7 * 3;
+        colWidths.quoteBalance +
+        5 * 3;
       const separator = '-'.repeat(totalWidth);
 
-      console.log(header);
+      logger.info('Printing market table:');
+      console.log(headerLine);
       console.log(separator);
 
+      // Print each market row.
       for (const data of marketsData) {
         const row =
           `${data.marketName.padEnd(colWidths.marketName)} | ` +
           `${data.marketPubkey.padEnd(colWidths.marketPubkey)} | ` +
-          `${data.baseVault.padEnd(colWidths.baseVault)} | ` +
-          `${data.quoteVault.padEnd(colWidths.quoteVault)} | ` +
           `${data.baseSymbol.padEnd(colWidths.baseSymbol)} | ` +
           `${data.quoteSymbol.padEnd(colWidths.quoteSymbol)} | ` +
-          `${data.quoteBalance.toString().padEnd(colWidths.quoteBalance)} | ` +
-          `${data.baseBalance.toString().padEnd(colWidths.baseBalance)}`;
+          `${data.baseBalance.toString().padEnd(colWidths.baseBalance)} | ` +
+          `${data.quoteBalance.toString().padEnd(colWidths.quoteBalance)}`;
         console.log(row);
       }
     } catch (error) {
