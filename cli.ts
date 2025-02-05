@@ -1,10 +1,35 @@
 /**
+ * 
+ * CLI Command: listMarkets
+ *
+ * Description
+ *   Loads all market accounts from the exchange and displays for each market:
+ *     - Market Name
+ *     - Market Pubkey
+ *     - Base Token Symbol
+ *     - Quote Token Symbol
+ *     - Base Deposits (UI units)
+ *     - Quote Deposits (UI units)
+ *     - Base Deposits in USD
+ *     - Quote Deposits in USD
+ *
+ *   The base conversion uses the base mint’s decimals to convert the raw native
+ *   deposit amount to human‑readable UI units.
+ *
+ *   Finally, the markets are sorted so that those with nonzero USD deposit sums
+ *   are listed first (sorted descending by USD deposit sum), and the remaining tokens
+ *   (with USD deposit sum of 0) are then sorted descending by their total deposit in UI units.
+ *
+ * Example
+ *   npx ts-node cli.ts listMarkets
+ * 
+ * 
  * CLI Command: marketData
  * 
  * Description
  * Monitors the order book for a specified market, displaying real-time updates on best bid/ask prices or the full order book liquidity.
  *
- * Example Usage
+ * Example
  * npx ts-node cli.ts marketData <MARKET_PUBLIC_KEY> --bestbidask
  * npx ts-node cli.ts marketData <MARKET_PUBLIC_KEY> --book
  *  
@@ -34,7 +59,7 @@
  * Fetches all OpenOrders accounts and the OpenOrdersIndexer for a given owner. 
  * If a market is specified, it fetches only OpenOrders accounts associated with that market.
  *
- * Example Usage
+ * Example
  * npx ts-node cli.ts getOOA <OWNER_PUBLIC_KEY> [--market <MARKET_PUBLIC_KEY>]
  *  
  * Parameters
@@ -44,12 +69,12 @@
  * 
  * CLI Command: closeOOA
  * 
- * Description:
+ * Description
  * - If --openOrders is provided, closes the specified OpenOrders account.
  * - If --market is provided, closes all OpenOrders accounts for that market.
  * - If --closeIndexer is provided, closes the OpenOrders indexer (only after all OpenOrders are closed).
  *
- * Example Usage:
+ * Example
  * npx ts-node cli.ts closeOOA --ownerKeypair <KEYPAIR_PATH> --openOrders <OPEN_ORDERS_PUBKEY>
  * npx ts-node cli.ts closeOOA --ownerKeypair <KEYPAIR_PATH> --market <MARKET_PUBKEY>
  * npx ts-node cli.ts closeOOA --ownerKeypair <KEYPAIR_PATH> --closeIndexer
@@ -96,7 +121,7 @@
  * Description
  * Withdraws funds from an OpenOrders account on OpenBook. This allows users to reclaim their base and quote tokens from an active market.
  *
- * Example Usage
+ * Example
  * npx ts-node cli.ts withdraw --market <MARKET_PUBKEY> --openOrders <OPEN_ORDERS_PUBKEY> --ownerKeypair <KEYPAIR_PATH>
  *  
  * Parameters
@@ -110,7 +135,7 @@
  * Description
  * Places a limit order on OpenBook by specifying the market, order parameters, and OpenOrders account.
  *
- * Example Usage
+ * Example
  * npx ts-node cli.ts limitOrder --market <MARKET_PUBKEY> --openOrders <OPEN_ORDERS_PUBKEY> --ownerKeypair <KEYPAIR_PATH> --side bid --price 100 --size 1
  *  
  * Parameters
@@ -129,7 +154,7 @@
  * Allows retrieving all OpenOrders accounts for a wallet or a specific OpenOrders account.
  * If a market is specified, results are filtered to that market.
  *
- * Example Usage
+ * Example
  * npx ts-node cli.ts getOrder --wallet <WALLET_PUBLIC_KEY>
  * npx ts-node cli.ts getOrder --openOrders <OPEN_ORDERS_PUBLIC_KEY> [--market <MARKET_PUBLIC_KEY>]
  *  
@@ -144,7 +169,7 @@
  * Description
  * Cancels an existing order on OpenBook by specifying the market, OpenOrders account, and either an `orderId`, `clientOrderId`, or canceling all orders.
  *
- * Example Usage
+ * Example
  * npx ts-node cli.ts cancelOrder --market <MARKET_PUBKEY> --openOrders <OPEN_ORDERS_PUBKEY> --orderId <ORDER_ID> --ownerKeypair <KEYPAIR_PATH>
  *  
  * Parameters

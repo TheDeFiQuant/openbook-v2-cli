@@ -1,7 +1,7 @@
 /**
  * CLI Command: listMarkets
  *
- * Description:
+ * Description
  *   Loads all market accounts from the exchange and displays for each market:
  *     - Market Name
  *     - Market Pubkey
@@ -12,9 +12,14 @@
  *     - Base Deposits in USD
  *     - Quote Deposits in USD
  *
- * The base conversion uses the base mint’s decimals.
+ *   The base conversion uses the base mint’s decimals to convert the raw native
+ *   deposit amount to human‑readable UI units.
  *
- * Example Usage:
+ *   Finally, the markets are sorted so that those with nonzero USD deposit sums
+ *   are listed first (sorted descending by USD deposit sum), and the remaining tokens
+ *   (with USD deposit sum of 0) are then sorted descending by their total deposit in UI units.
+ *
+ * Example
  *   npx ts-node cli.ts listMarkets
  */
 
@@ -42,7 +47,7 @@ function toUiDecimals(nativeAmount: number, decimals: number): number {
 }
 
 //──────────────────────────────────────────────────────────────────────────────
-// Helper: Format a number with thousand separators (max 2 fraction digits). 
+// Helper: Format a number with thousand separators (maximum 2 decimal places).
 // Zero is displayed as "0" without decimals.
 function formatNumber(num: number): string {
   if (num === 0) return "0";
@@ -65,7 +70,7 @@ async function getTokenSymbol(connection: Connection, mint: PublicKey): Promise<
 
 //──────────────────────────────────────────────────────────────────────────────
 // Batch fetch prices from Jupiter’s Price API with rate limiting.
-// This function processes tokens in batches (50 per batch) and waits 2 seconds between batches.
+// Processes tokens in batches of 50 and waits 2 seconds between batches.
 async function fetchPricesForMints(mintIds: string[]): Promise<{ [id: string]: number }> {
   const result: { [id: string]: number } = {};
   const chunkSize = 50;
@@ -85,7 +90,7 @@ async function fetchPricesForMints(mintIds: string[]): Promise<{ [id: string]: n
     } catch (err) {
       logger.error(`Error fetching price for tokens: ${(err as Error).message}`);
     }
-    // Wait 2 seconds before processing the next batch.
+    // Wait 2 seconds before the next batch.
     if (i + chunkSize < mintIds.length) {
       await new Promise(res => setTimeout(res, 2000));
     }
@@ -94,6 +99,7 @@ async function fetchPricesForMints(mintIds: string[]): Promise<{ [id: string]: n
 }
 
 //──────────────────────────────────────────────────────────────────────────────
+// Interface for command arguments.
 interface ListMarketsArgs {}
 
 //──────────────────────────────────────────────────────────────────────────────
@@ -101,21 +107,25 @@ interface ListMarketsArgs {}
 const listMarkets: CommandModule<{}, ListMarketsArgs> = {
   command: 'listMarkets',
   describe:
-    'Load all market accounts and display their market name, pubkey, token symbols, deposits (UI amounts) and USD values.',
+    'Load all market accounts and display market name, pubkey, token symbols, deposits (UI amounts) and USD values.',
   builder: (yargs) =>
     yargs.example('npx ts-node cli.ts listMarkets', 'Lists all markets using the default RPC endpoint'),
   handler: async () => {
     try {
+      // Connect to the RPC endpoint.
       logger.info('Connecting to RPC endpoint...');
       const connection: Connection = createConnection();
 
+      // Create a provider and a stub wallet.
       logger.info('Creating provider and stub wallet...');
       const wallet = createStubWallet();
       const provider = createProvider(connection, wallet);
 
+      // Initialize the OpenBook client.
       logger.info('Initializing OpenBook client...');
       const client = createClient(provider);
 
+      // Load all market accounts.
       logger.info('Loading market accounts...');
       const marketAccounts = await client.program.account.market.all();
       logger.info(`Loaded ${marketAccounts.length} market account(s).`);
@@ -134,12 +144,11 @@ const listMarkets: CommandModule<{}, ListMarketsArgs> = {
         quoteBalanceUsd: number;
       }[] = [];
 
+      // Process each market and update the live counter on the same line.
       let processedCount = 0;
-      // Process each market account.
       for (const marketAccount of marketAccounts) {
         try {
           processedCount++;
-          // Update the live counter on the same line.
           process.stdout.write(`Processed ${processedCount} of ${marketAccounts.length} markets...\r`);
 
           const marketPubkey = marketAccount.publicKey;
@@ -175,18 +184,18 @@ const listMarkets: CommandModule<{}, ListMarketsArgs> = {
             quoteSymbol,
             baseBalance: uiBaseBalance,
             quoteBalance: uiQuoteBalance,
-            baseBalanceUsd: 0,  // To be updated after fetching prices.
-            quoteBalanceUsd: 0, // To be updated after fetching prices.
+            baseBalanceUsd: 0,  // To be filled later.
+            quoteBalanceUsd: 0, // To be filled later.
           });
         } catch (err) {
           logger.error(`Error processing market ${marketAccount.publicKey.toBase58()}: ${(err as Error).message}`);
         }
       }
-      // Ensure the live counter goes to a new line once processing is complete.
+      // Move the live counter to a new line.
       console.log('');
       logger.info(`Finished processing ${processedCount} market(s).`);
 
-      // Build a set of unique mints to query prices (only for tokens with nonzero deposits).
+      // Build a set of unique mints (only query prices for tokens with nonzero deposits).
       const mintSet = new Set<string>();
       for (const market of marketsData) {
         if (market.baseBalance !== 0) mintSet.add(market.baseMint);
@@ -195,21 +204,39 @@ const listMarkets: CommandModule<{}, ListMarketsArgs> = {
       const uniqueMints = Array.from(mintSet);
       logger.info(`Fetching prices for ${uniqueMints.length} unique token(s) from Jupiter API...`);
 
-      // Batch query the Jupiter Price API.
+      // Fetch prices from Jupiter API.
       const prices = await fetchPricesForMints(uniqueMints);
       logger.info('Price data retrieved from Jupiter API.');
 
       // Update each market with USD deposit values.
       for (const market of marketsData) {
-        // If a deposit is 0, the USD value remains 0.
+        // If a deposit is 0, its USD value remains 0.
         const basePrice = prices[market.baseMint] || 0;
         const quotePrice = prices[market.quoteMint] || 0;
         market.baseBalanceUsd = market.baseBalance * basePrice;
         market.quoteBalanceUsd = market.quoteBalance * quotePrice;
       }
 
-      // Sort markets in descending order by the sum of base and quote USD deposits.
-      marketsData.sort((a, b) => (b.baseBalanceUsd + b.quoteBalanceUsd) - (a.baseBalanceUsd + a.quoteBalanceUsd));
+      // Sort the markets:
+      //  - First, markets with a nonzero USD deposit sum (base + quote) are sorted descending by that sum.
+      //  - Then, markets with USD deposit sum of 0 are sorted descending by their UI deposit sum (base + quote).
+      marketsData.sort((a, b) => {
+        const sumUsdA = a.baseBalanceUsd + a.quoteBalanceUsd;
+        const sumUsdB = b.baseBalanceUsd + b.quoteBalanceUsd;
+        if (sumUsdA > 0 && sumUsdB > 0) {
+          return sumUsdB - sumUsdA;
+        } else if (sumUsdA > 0 && sumUsdB === 0) {
+          return -1;
+        } else if (sumUsdA === 0 && sumUsdB > 0) {
+          return 1;
+        } else {
+          // Both have zero USD deposits: sort descending by UI deposit sum.
+          const sumUIA = a.baseBalance + a.quoteBalance;
+          const sumUIB = b.baseBalance + b.quoteBalance;
+          return sumUIB - sumUIA;
+        }
+      });
+
       logger.info(`Displaying ${marketsData.length} market(s).`);
 
       // Define table headers.
@@ -224,7 +251,7 @@ const listMarkets: CommandModule<{}, ListMarketsArgs> = {
         quoteBalanceUsd: 'Quote Deposits ($)',
       };
 
-      // Determine column widths with formatted numbers.
+      // Determine column widths.
       const colWidths = {
         marketName: Math.max(...marketsData.map((d) => d.marketName.length), headers.marketName.length, 20),
         marketPubkey: Math.max(...marketsData.map((d) => d.marketPubkey.length), headers.marketPubkey.length, 44),
@@ -265,6 +292,9 @@ const listMarkets: CommandModule<{}, ListMarketsArgs> = {
 
       // Print each market row.
       for (const data of marketsData) {
+        // Format USD deposits: if the value is zero, show "0" with no decimals.
+        const baseUsdStr = data.baseBalanceUsd === 0 ? "0" : formatNumber(data.baseBalanceUsd);
+        const quoteUsdStr = data.quoteBalanceUsd === 0 ? "0" : formatNumber(data.quoteBalanceUsd);
         const row =
           `${data.marketName.padEnd(colWidths.marketName)} | ` +
           `${data.marketPubkey.padEnd(colWidths.marketPubkey)} | ` +
@@ -272,8 +302,8 @@ const listMarkets: CommandModule<{}, ListMarketsArgs> = {
           `${data.quoteSymbol.padEnd(colWidths.quoteSymbol)} | ` +
           `${formatNumber(data.baseBalance).padEnd(colWidths.baseBalance)} | ` +
           `${formatNumber(data.quoteBalance).padEnd(colWidths.quoteBalance)} | ` +
-          `${formatNumber(data.baseBalanceUsd).padEnd(colWidths.baseBalanceUsd)} | ` +
-          `${formatNumber(data.quoteBalanceUsd).padEnd(colWidths.quoteBalanceUsd)}`;
+          `${baseUsdStr.padEnd(colWidths.baseBalanceUsd)} | ` +
+          `${quoteUsdStr.padEnd(colWidths.quoteBalanceUsd)}`;
         console.log(row);
       }
     } catch (error) {
