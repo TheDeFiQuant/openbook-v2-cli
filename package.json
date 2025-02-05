@@ -1,6 +1,6 @@
 {
   "name": "openbook-cli",
-  "version": "0.1.0",
+  "version": "0.9.0",
   "description": "CLI for interacting with OpenBook v2 on Solana.",
   "repository": {
     "type": "git",

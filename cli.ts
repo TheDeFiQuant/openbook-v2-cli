@@ -13,13 +13,6 @@
  *     - Base Deposits in USD
  *     - Quote Deposits in USD
  *
- *   The base conversion uses the base mint’s decimals to convert the raw native
- *   deposit amount to human‑readable UI units.
- *
- *   Finally, the markets are sorted so that those with nonzero USD deposit sums
- *   are listed first (sorted descending by USD deposit sum), and the remaining tokens
- *   (with USD deposit sum of 0) are then sorted descending by their total deposit in UI units.
- *
  * Example
  *   npx ts-node cli.ts listMarkets
  * 
