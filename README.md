@@ -31,15 +31,14 @@ npx ts-node cli.ts <command> [options]
 ### List Markets
 
 Loads all market accounts from the exchange and displays for each market:
-
-      - Market Name
-      - Market Pubkey
-      - Base Token Symbol
-      - Quote Token Symbol
-      - Base Deposits (UI units)
-      - Quote Deposits (UI units)
-      - Base Deposits in USD
-      - Quote Deposits in USD
+- Market Name
+- Market Pubkey
+- Base Token Symbol
+- Quote Token Symbol
+- Base Deposits (UI units)
+- Quote Deposits (UI units)
+- Base Deposits in USD
+- Quote Deposits in USD
 
 ```sh
 npx ts-node cli.ts listMarkets
